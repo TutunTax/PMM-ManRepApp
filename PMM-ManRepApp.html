@@ -3683,6 +3683,22 @@ function renderDashboard(){
       </div>
     </div>
 
+    <!-- Debt Schedule Snapshot -->
+    ${(function(){
+      let facs=dsFacilities();
+      if(!facs.length)return '';
+      let recon=client.debtRecon&&client.debtRecon[rm]?client.debtRecon[rm]:{};
+      let hasData=facs.some(function(f){let e=recon[f.id]||{};return e.stmtCapital!==null&&e.stmtCapital!==undefined;});
+      if(!hasData)return '';
+      return '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+          '<h3 style="margin:0;font-size:14px">Debt Schedule — '+monthLabel(rm)+'</h3>'+
+          '<button class="btn sm" onclick="show(\'debt_schedule\')">View Full →</button>'+
+        '</div>'+
+        dsSnapshotTable(cur,rm)+
+      '</div>';
+    })()}
+
     <!-- Commentary -->
     ${client.narrative?`<div style="background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px">
       <b style="font-size:13px">Monthly Commentary</b>
@@ -4289,8 +4305,8 @@ function dsBuildRecon(cur,rm){
       if(tl!=='green')allReconciled=false;
     } else if(!hasStmt){allReconciled=false;}
 
-    var tlSpan='<span class="tl-'+tl+'">'+(tl==='grey'?'&mdash;':tl==='green'?'&#10003; OK':'&#10007; Variance')+'</span>';
-    var rateStr=impliedRate!==null?'<div style="font-size:10px;color:var(--muted)">'+(impliedRate*1200).toFixed(2)+'% p.a.</div>':'';
+    var tlSpan='<span class="tl-'+tl+'" id="tl_'+fid+'">'+(tl==='grey'?'&mdash;':tl==='green'?'&#10003; OK':'&#10007; Variance')+'</span>';
+    var rateStr=impliedRate!==null?'<div class="ds-rate-lbl" style="font-size:10px;color:var(--muted)">'+(impliedRate*1200).toFixed(2)+'% p.a.</div>':'<div class="ds-rate-lbl" style="font-size:10px;color:var(--muted)"></div>';
 
     var fid=f.id;
     var openingCell=
@@ -4335,7 +4351,7 @@ function dsBuildRecon(cur,rm){
       '</td>'+
       '<td class="right" id="rem_'+fid+'">'+remCell+'</td>'+
       '<td class="right">'+(hasBSData&&(f.sageNCP||f.sageCP)?money(bsVal,cur):'<span class="muted">&mdash;</span>')+'</td>'+
-      '<td class="right">'+(variance!==null?'<span style="color:'+(varAbs<1?'var(--ok)':'var(--bad)')+'">'+money(variance,cur)+'</span>':'<span class="muted">&mdash;</span>')+'</td>'+
+      '<td class="right" id="var_'+fid+'">'+(variance!==null?'<span style="color:'+(varAbs<1?'var(--ok)':'var(--bad)')+'">'+money(variance,cur)+'</span>':'<span class="muted">&mdash;</span>')+'</td>'+
       '<td>'+tlSpan+'</td>'+
     '</tr>';
   }).join('');
@@ -4373,30 +4389,82 @@ function dsBuildRecon(cur,rm){
 }
 
 // Refresh just the remaining instalments cell after input changes — no full re-render
-function dsRefreshRemaining(facId){
+// Live row refresh — called after every field change via onchange
+// Updates: remaining instalments, implied rate, variance, status
+// WITHOUT touching the input elements themselves (preserves focus and typed value)
+function dsRefreshRow(facId){
   var rm=client.settings.reportMonth;
+  var cur=client.settings.currency||'R';
   var f=dsFacilities().find(function(x){return x.id===facId;});
   if(!f)return;
   var e=dsEntry(facId);
+
+  // ── Remaining instalments ─────────────────────────────────────
   var priorCap=dsPriorCapital(facId,rm);
   var openingBal=e.openingBalance!==null&&e.openingBalance!==undefined?e.openingBalance:priorCap;
   var stmtCap=e.stmtCapital;
   var totalInterest=(e.stmtInterest||0)+(e.stmtAdminFee||0);
   var inst=e.instalment!==null&&e.instalment!==undefined?e.instalment:f.instalment;
   var calcRem=null;
+  var impliedRate=null;
   if(stmtCap!==null&&openingBal&&totalInterest>0&&inst>0){
+    impliedRate=totalInterest/openingBal;
     calcRem=dsCalcRemaining(openingBal,totalInterest,stmtCap,inst);
-  } else if(stmtCap!==null&&inst>0&&totalInterest===0){
-    calcRem=stmtCap>0?Math.round((stmtCap/inst)*100)/100:0;
+  } else if(stmtCap!==null&&inst>0&&totalInterest===0&&stmtCap>0){
+    calcRem=Math.round((stmtCap/inst)*100)/100;
   }
-  if(e.remainingInstalments!==null&&e.remainingInstalments!==undefined)return; // manual override in place
-  var cell=document.getElementById('rem_'+facId);
-  if(!cell)return;
-  var inp=cell.querySelector('input');
-  if(inp&&calcRem!==null)inp.placeholder='Calc: '+calcRem.toFixed(1);
-  var divs=cell.querySelectorAll('div');
-  if(divs.length>0&&calcRem!==null)divs[0].textContent=calcRem.toFixed(1)+' calculated';
+
+  // Update remaining cell — only if no manual override
+  var remManual=e.remainingInstalments!==null&&e.remainingInstalments!==undefined;
+  var remCell=document.getElementById('rem_'+facId);
+  if(remCell){
+    var inp=remCell.querySelector('input');
+    var divs=remCell.querySelectorAll('div');
+    if(!remManual){
+      if(inp){
+        inp.placeholder=calcRem!==null?'Calc: '+calcRem.toFixed(1):'Enter manually';
+        // Only write the value if the input isn't currently focused (user might be typing)
+        if(document.activeElement!==inp){
+          inp.value=calcRem!==null?calcRem.toFixed(1):'';
+        }
+      }
+      if(divs[0])divs[0].textContent=calcRem!==null?calcRem.toFixed(1)+' calculated':'';
+    }
+    // Rate label (second div)
+    var rateDiv=remCell.querySelector('.ds-rate-lbl');
+    if(rateDiv)rateDiv.textContent=impliedRate!==null?(impliedRate*1200).toFixed(2)+'% p.a.':'';
+  }
+
+  // ── Variance and status ───────────────────────────────────────
+  var bs=client.raw.bs.accounts||{};
+  var hasBSData=Object.keys(bs).length>0;
+  var bsVal=bsBalForFacility(f);
+  var hasStmt=stmtCap!==null;
+  var hasBS=hasBSData&&(f.sageNCP||f.sageCP);
+  var variance=hasStmt&&hasBS?stmtCap-bsVal:null;
+  var varAbs=variance!==null?Math.abs(variance):null;
+
+  var varCell=document.getElementById('var_'+facId);
+  if(varCell){
+    if(variance!==null){
+      varCell.innerHTML='<span style="color:'+(varAbs<1?'var(--ok)':'var(--bad)')+'">'+money(variance,cur)+'</span>';
+    } else {
+      varCell.innerHTML='<span class="muted">&mdash;</span>';
+    }
+  }
+
+  var tl='grey';
+  if(hasStmt&&hasBS) tl=varAbs<1?'green':'red';
+  else if(!hasStmt) tl='grey';
+  var statusCell=document.getElementById('tl_'+facId);
+  if(statusCell){
+    statusCell.className='tl-'+tl;
+    statusCell.textContent=tl==='grey'?'—':tl==='green'?'✓ OK':'✗ Variance';
+  }
 }
+
+// Kept for backward compat — just calls dsRefreshRow now
+function dsRefreshRemaining(facId){ dsRefreshRow(facId); }
 
 function dsSetEntry(facId,field,val){
   ensureClientDefaults();
@@ -4404,6 +4472,7 @@ function dsSetEntry(facId,field,val){
   if(!r[facId])r[facId]={openingBalance:null,stmtCapital:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
   r[facId][field]=val;
   mark();
+  dsRefreshRow(facId);
 }
 
 // ── TAB 3: Journal ────────────────────────────────────────────────────────────
@@ -4561,29 +4630,50 @@ function dsBuildSnapshot(cur,rm){
   if(!rm) return '<div class="ds-section active"><div class="warning">Set the Report Month in Settings first.</div></div>';
   let facs=dsFacilities();
   if(!facs.length) return '<div class="ds-section active"><div class="warning">No facilities set up yet.</div></div>';
-  let recon=dsRecon();
+  let recon=client.debtRecon&&client.debtRecon[rm]?client.debtRecon[rm]:{};
 
   let totalCap=0,totalInst=0;
-  let rows=facs.map(f=>{
+  let rows=facs.map(function(f){
     let e=recon[f.id]||{};
     let cap=e.stmtCapital!==null&&e.stmtCapital!==undefined?e.stmtCapital:null;
     let inst=e.instalment!==null&&e.instalment!==undefined?e.instalment:f.instalment;
-    let rem=e.remainingInstalments!==null&&e.remainingInstalments!==undefined?e.remainingInstalments:null;
-    if(cap===null&&!inst)return ''; // skip empty
+
+    // Remaining: manual override first, then calculate from statement figures
+    let rem=null;
+    if(e.remainingInstalments!==null&&e.remainingInstalments!==undefined){
+      rem=e.remainingInstalments;
+    } else {
+      // Try to calculate from statement figures
+      let priorCap=dsPriorCapital(f.id,rm);
+      let openingBal=e.openingBalance!==null&&e.openingBalance!==undefined?e.openingBalance:priorCap;
+      let totalInterest=(e.stmtInterest||0)+(e.stmtAdminFee||0);
+      if(cap!==null&&openingBal&&totalInterest>0&&inst>0){
+        rem=dsCalcRemaining(openingBal,totalInterest,cap,inst);
+      } else if(cap!==null&&inst>0&&totalInterest===0&&cap>0){
+        rem=Math.round((cap/inst)*100)/100;
+      }
+    }
+
+    if(cap===null&&!inst)return ''; // skip completely empty
     if(cap!==null)totalCap+=cap;
     if(inst)totalInst+=inst;
+
+    // Display remaining: show 1 decimal place
+    let remDisplay=rem!==null?rem.toFixed(1):'—';
+
     return '<tr>'+
       '<td>'+esc(f.financer||'—')+'</td>'+
       '<td>'+esc(f.accountNo||'—')+'</td>'+
       '<td>'+esc(f.description||'—')+'</td>'+
       '<td class="right">'+(cap!==null?money(cap,cur):'<span class="muted">—</span>')+'</td>'+
       '<td class="right">'+(inst?money(inst,cur):'<span class="muted">—</span>')+'</td>'+
-      '<td class="right">'+(rem!==null?rem:'<span class="muted">—</span>')+'</td>'+
+      '<td class="right">'+(rem!==null?remDisplay:'<span class="muted">—</span>')+'</td>'+
     '</tr>';
   }).join('');
 
-  return '<div class="ds-section active">'+
-    '<p class="muted" style="font-size:12px;margin-bottom:10px">Client-facing snapshot for <b>'+monthLabel(rm)+'</b>. Figures from the Monthly Recon tab.</p>'+
+  let activeFacs=facs.filter(function(f){let e=recon[f.id]||{};return e.stmtCapital>0;}).length;
+
+  let tableHtml=
     '<div class="ds-table-wrap">'+
       '<table>'+
         '<thead><tr>'+
@@ -4604,7 +4694,7 @@ function dsBuildSnapshot(cur,rm){
         '</tbody>'+
       '</table>'+
     '</div>'+
-    '<div style="margin-top:12px;display:flex;gap:10px">'+
+    '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">'+
       '<div style="background:#f0f4ff;border:1px solid var(--line);border-radius:8px;padding:12px 20px;text-align:center">'+
         '<div style="font-size:11px;color:var(--muted)">Total Capital Outstanding</div>'+
         '<div style="font-size:20px;font-weight:bold">'+money(totalCap,cur)+'</div>'+
@@ -4615,10 +4705,20 @@ function dsBuildSnapshot(cur,rm){
       '</div>'+
       '<div style="background:#f0f4ff;border:1px solid var(--line);border-radius:8px;padding:12px 20px;text-align:center">'+
         '<div style="font-size:11px;color:var(--muted)">Active Facilities</div>'+
-        '<div style="font-size:20px;font-weight:bold">'+facs.filter(f=>{let e=dsRecon()[f.id]||{};return e.stmtCapital>0;}).length+'</div>'+
+        '<div style="font-size:20px;font-weight:bold">'+activeFacs+'</div>'+
       '</div>'+
-    '</div>'+
+    '</div>';
+
+  return '<div class="ds-section active">'+
+    '<p class="muted" style="font-size:12px;margin-bottom:10px">Client-facing snapshot for <b>'+monthLabel(rm)+'</b>. Figures from the Monthly Recon tab.</p>'+
+    tableHtml+
   '</div>';
+}
+
+// Shared snapshot table builder — used by both Snapshot tab and Dashboard
+function dsSnapshotTable(cur,rm){
+  if(!rm||!dsFacilities().length)return '';
+  return dsBuildSnapshot(cur,rm).replace('<div class="ds-section active">','<div>');
 }
 
 // ── Debt Schedule QC helper (used by qcChecks) ───────────────────────────────
