@@ -9,7 +9,7 @@
 <style>
 :root{
   --ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--paper:#fff;--bg:#f4f6f8;
-  --brand:#8B1A1A;--soft:#fdf2f2;--ok:#047857;--warn:#b45309;--bad:#b91c1c;
+  --brand:#1a56db;--soft:#eff6ff;--ok:#047857;--warn:#b45309;--bad:#b91c1c;
   --ok-bg:#ecfdf5;--warn-bg:#fffbeb;--bad-bg:#fef2f2;
   /* Department colours */
   --bm:#1e3a5f; --bm-soft:#eff6ff;
@@ -92,7 +92,7 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 .budget-tbl .subtotal-row td{background:#f0f4ff;font-weight:bold;font-size:12px}
 .budget-tbl .total-row td{background:#eef2ff;font-weight:bold;border-top:2px solid #374151;font-size:12px}
 .budget-input{width:90px;text-align:right;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font:inherit;font-size:12px}
-.budget-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(139,26,26,.15)}
+.budget-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(26,86,219,.15)}
 .budget-cell{display:flex;align-items:center;gap:3px}
 .copy-fwd{border:1px solid #d1d5db;background:#f9fafb;border-radius:5px;padding:2px 5px;font-size:10px;cursor:pointer;color:var(--muted);white-space:nowrap;flex-shrink:0}
 .copy-fwd:hover{background:var(--soft);border-color:var(--brand);color:var(--brand)}
@@ -131,6 +131,33 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 .dept-card table{font-size:12px}
 .dept-card th,.dept-card td{padding:5px 6px}
 
+/* ── Debt Schedule Module ────────────────────────────────────── */
+.ds-tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--line);padding-bottom:0}
+.ds-tab{background:none;border:none;padding:9px 16px;cursor:pointer;font:inherit;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px}
+.ds-tab.active{color:var(--brand);font-weight:bold;border-bottom-color:var(--brand)}
+.ds-tab:hover{color:var(--brand)}
+.ds-section{display:none}.ds-section.active{display:block}
+/* Sticky-header scrollable tables */
+.ds-table-wrap{overflow:auto;max-height:calc(100vh - 320px);border:1px solid var(--line);border-radius:8px}
+.ds-table-wrap table{width:100%;border-collapse:separate;border-spacing:0}
+.ds-table-wrap thead th{position:sticky;top:0;z-index:3;background:#f9fafb;border-bottom:2px solid var(--line);padding:7px 8px;font-size:12px;white-space:nowrap;box-shadow:0 1px 0 var(--line)}
+.ds-table-wrap td{border-bottom:1px solid var(--line);padding:6px 8px;font-size:12px;vertical-align:middle}
+/* Traffic lights */
+.tl-green{background:#ecfdf5;color:#047857;font-weight:bold;border-radius:6px;padding:2px 8px;font-size:11px}
+.tl-red{background:#fef2f2;color:#b91c1c;font-weight:bold;border-radius:6px;padding:2px 8px;font-size:11px}
+.tl-grey{background:#f3f4f6;color:#6b7280;font-weight:bold;border-radius:6px;padding:2px 8px;font-size:11px}
+/* Inline inputs inside table cells - key fix for single-character bug */
+.ds-input{width:100%;border:1px solid #d1d5db;border-radius:5px;padding:4px 6px;font:inherit;font-size:12px;background:#fff;box-sizing:border-box}
+.ds-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(26,86,219,.12)}
+.ds-input.right{text-align:right}
+.ds-sum-row td{background:#f0f4ff;font-weight:bold;border-top:2px solid #374151}
+.ds-facility-type{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:bold}
+.ds-type-amort{background:#dbeafe;color:#1e40af}
+.ds-type-revolving{background:#fef3c7;color:#92400e}
+.ds-type-overdraft{background:#fee2e2;color:#991b1b}
+.ds-type-director{background:#f3e8ff;color:#6b21a8}
+.ds-type-other{background:#f3f4f6;color:#374151}
+
 @media print{
   header,nav,.no-print{display:none!important}
   .app{display:block}
@@ -150,7 +177,7 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 <body>
 <header>
   <div>
-    <h1>PMM Management Report Engine <small>v1.0</small></h1>
+    <h1>PMM Management Report Engine <small>v1.1</small></h1>
   </div>
   <div class="hdr-right">
     <span class="save-state" id="saveState">No file loaded</span>
@@ -671,6 +698,18 @@ function ensureClientDefaults(){
   if(kb.corp_tax_rate===undefined)kb.corp_tax_rate=0.27;
   if(!client.narrative)client.narrative='';
   if(!client.debtSchedule)client.debtSchedule=[];
+  if(!client.facilities)client.facilities=[];
+  if(!client.debtRecon)client.debtRecon={};
+  // Migrate legacy debtSchedule rows into facilities (one-time, non-destructive)
+  if(client.debtSchedule.length>0&&client.facilities.length===0){
+    client.facilities=client.debtSchedule.map(function(r,i){return {
+      id:'fac_'+Date.now()+'_'+i,
+      financer:r.financer||'',accountNo:r.account||'',
+      description:r.description||'',type:'amort',
+      instalment:r.instalment||0,
+      sageNCP:'',sageCP:'',sageInterest:'Interest on Instalment agreements'
+    };});
+  }
   if(!client.stockRecon)client.stockRecon={};
   if(!client.estitrackRecon)client.estitrackRecon={};
   // Ensure ppeNotes entries without calling getPPEClasses (avoids recursion)
@@ -3742,6 +3781,14 @@ function qcChecks(){
       detail:ppeFailClasses.length?`Recon difference in: ${ppeFailClasses.join(', ')}`:''});
   }
 
+  // 9b. Debt Schedule reconciled
+  let dsQC=dsQCCheck();
+  if(dsQC!==null){
+    checks.push({id:'debt_recon',label:'Debt Schedule reconciled — all facility balances agree to Balance Sheet',
+      pass:dsQC.pass,
+      detail:dsQC.pass?'':dsQC.count+' facilit'+(dsQC.count===1?'y':'ies')+' unreconciled: '+dsQC.names.slice(0,3).join(', ')+(dsQC.names.length>3?'…':'')});
+  }
+
   // 10. Staff savings reconciliation
   let ss=staffSavingsRecon();
   if(ss.hasData){
@@ -3955,71 +4002,480 @@ function renderManagementReport(){
       <h2 style="margin-bottom:12px">Creditors Age Analysis</h2>
       ${apHtml}
     </div>
+
+    <!-- Debt Schedule Snapshot -->
+    ${(()=>{let facs=dsFacilities();if(!facs.length)return '';let snap=dsBuildSnapshot(cur,rm);return '<div style="border-top:2px solid var(--brand);padding-top:16px;margin-bottom:24px"><h2 style="margin-bottom:12px">Debt Schedule</h2>'+snap+'</div>';})()}
   </div>`;
 }
 
 // ═══════════════════════════════════════════════════════
-//  DEBT SCHEDULE
+//  DEBT SCHEDULE — v2.0 (Facilities + Monthly Recon + Journal + Snapshot)
 // ═══════════════════════════════════════════════════════
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function dsFacilities(){return client.facilities||[];}
+function dsReconKey(){return client.settings.reportMonth||'';}
+function dsRecon(){
+  let k=dsReconKey();
+  if(!client.debtRecon)client.debtRecon={};
+  if(!client.debtRecon[k])client.debtRecon[k]={};
+  return client.debtRecon[k];
+}
+function dsEntry(facId){
+  let r=dsRecon();
+  if(!r[facId])r[facId]={stmtCapital:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
+  return r[facId];
+}
+function bsBalForFacility(fac){
+  // Return combined NCP+CP balance from latest imported BS
+  let bs=client.raw.bs.accounts||{};
+  let ncp=num(bs[fac.sageNCP]);
+  let cp=num(bs[fac.sageCP]);
+  return ncp+cp;
+}
+function dsTypeClass(t){
+  return {amort:'ds-type-amort',revolving:'ds-type-revolving',overdraft:'ds-type-overdraft',director:'ds-type-director',other:'ds-type-other'}[t]||'ds-type-other';
+}
+function dsTypeLabel(t){
+  return {amort:'Amortising',revolving:'Revolving',overdraft:'Overdraft',director:'Director Loan',other:'Other'}[t]||t;
+}
+
+// ── Active tab state ──────────────────────────────────────────────────────────
+let _dsTab='facilities';
+function dsShowTab(t){_dsTab=t;renderDebtSchedule();}
+
+// ── Main render ───────────────────────────────────────────────────────────────
 function renderDebtSchedule(){
   ensureClientDefaults();
-  if(!client.debtSchedule)client.debtSchedule=[];
   let cur=client.settings.currency||'R';
-  let rows=client.debtSchedule;
+  let rm=client.settings.reportMonth;
+  let el=document.getElementById('debt_schedule');
 
-  let totalBalance=rows.reduce((s,r)=>s+num(r.balance),0);
-  let totalInstalment=rows.reduce((s,r)=>s+num(r.instalment),0);
+  let tabs=['facilities','recon','journal','snapshot'].map(t=>{
+    let labels={facilities:'⚙ Facilities',recon:'🔍 Monthly Recon',journal:'📄 Journal',snapshot:'📊 Snapshot'};
+    return '<button class="ds-tab'+((_dsTab===t)?' active':'')+'" onclick="dsShowTab(\''+t+'\')">'+labels[t]+'</button>';
+  }).join('');
 
-  let tbody=rows.length?rows.map((r,i)=>`<tr>
-    <td><input value="${esc(r.financer||'')}" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:12px" onchange="client.debtSchedule[${i}].financer=this.value"></td>
-    <td><input value="${esc(r.account||'')}" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:12px" onchange="client.debtSchedule[${i}].account=this.value"></td>
-    <td><input value="${esc(r.description||'')}" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:12px" onchange="client.debtSchedule[${i}].description=this.value"></td>
-    <td><input type="number" value="${r.balance?Math.round(r.balance):''}" step="0.01" lang="en-ZA" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:12px;text-align:right" onchange="client.debtSchedule[${i}].balance=num(this.value);renderDebtSchedule()"></td>
-    <td><input type="number" value="${r.instalment?Math.round(r.instalment*100)/100:''}" step="0.01" lang="en-ZA" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:12px;text-align:right" onchange="client.debtSchedule[${i}].instalment=num(this.value);renderDebtSchedule()"></td>
-    <td><input type="number" value="${r.remainingMonths||''}" style="width:80px;border:1px solid #d1d5db;border-radius:4px;padding:4px 6px;font-size:12px;text-align:right" onchange="client.debtSchedule[${i}].remainingMonths=+this.value"></td>
-    <td style="text-align:right;font-size:12px">${r.instalment&&r.remainingMonths?money(r.instalment*r.remainingMonths,cur):'—'}</td>
-    <td><button class="btn sm danger" onclick="client.debtSchedule.splice(${i},1);renderDebtSchedule()">✕</button></td>
-  </tr>`).join(''):'<tr><td colspan="8" class="muted" style="padding:12px;text-align:center">No facilities entered yet. Click + Add Facility to begin.</td></tr>';
+  let inner='';
+  if(_dsTab==='facilities') inner=dsBuildFacilities(cur);
+  else if(_dsTab==='recon')  inner=dsBuildRecon(cur,rm);
+  else if(_dsTab==='journal')inner=dsBuildJournal(cur,rm);
+  else if(_dsTab==='snapshot')inner=dsBuildSnapshot(cur,rm);
 
-  document.getElementById('debt_schedule').innerHTML=`
-  <div class="panel">
-    <h2>Debt Schedule</h2>
-    <p class="muted" style="margin-bottom:12px;font-size:12px">Enter the current outstanding balance and instalment details for each financing facility. This data is entered manually each month after reconciling your bank statements.</p>
-    <div class="btns" style="margin-bottom:12px">
-      <button class="btn primary" onclick="client.debtSchedule.push({financer:'',account:'',description:'',balance:0,instalment:0,remainingMonths:0});renderDebtSchedule()">+ Add Facility</button>
-      <button class="btn" onclick="mark()">💾 Save</button>
-    </div>
-    <div style="overflow:auto">
-    <table>
-      <thead><tr>
-        <th style="min-width:140px">Financer</th>
-        <th style="min-width:120px">Account No.</th>
-        <th style="min-width:180px">Description</th>
-        <th style="min-width:110px;text-align:right">Capital Balance</th>
-        <th style="min-width:110px;text-align:right">Monthly Instalment</th>
-        <th style="width:80px;text-align:right">Months Left</th>
-        <th style="min-width:110px;text-align:right">Total Remaining</th>
-        <th style="width:40px"></th>
-      </tr></thead>
-      <tbody>${tbody}</tbody>
-      <tfoot><tr style="font-weight:bold;background:#f9fafb">
-        <td colspan="3">TOTAL</td>
-        <td style="text-align:right">${money(totalBalance,cur)}</td>
-        <td style="text-align:right">${money(totalInstalment,cur)}</td>
-        <td colspan="3"></td>
-      </tfoot>
-    </table>
-    </div>
-    ${rows.length?`
-    <div style="margin-top:16px;background:#f9fafb;border:1px solid var(--line);border-radius:8px;padding:14px">
-      <h3 style="margin:0 0 10px;font-size:13px">Summary</h3>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div><div style="font-size:11px;color:var(--muted)">Total Capital Outstanding</div><div style="font-size:18px;font-weight:bold">${money(totalBalance,cur)}</div></div>
-        <div><div style="font-size:11px;color:var(--muted)">Total Monthly Instalments</div><div style="font-size:18px;font-weight:bold">${money(totalInstalment,cur)}</div></div>
-        <div><div style="font-size:11px;color:var(--muted)">Facilities</div><div style="font-size:18px;font-weight:bold">${rows.length}</div></div>
-      </div>
-    </div>`:''}
-  </div>`;
+  el.innerHTML=
+    '<div class="panel" style="padding-bottom:8px">'+
+      '<h2 style="margin-bottom:10px">Debt Schedule</h2>'+
+      '<div class="ds-tabs">'+tabs+'</div>'+
+      inner+
+    '</div>';
+}
+
+// ── TAB 1: Facilities setup ───────────────────────────────────────────────────
+function dsBuildFacilities(cur){
+  let facs=dsFacilities();
+  let typeOpts=['amort','revolving','overdraft','director','other'].map(t=>
+    '<option value="'+t+'">'+dsTypeLabel(t)+'</option>').join('');
+
+  let rows=facs.length?facs.map((f,i)=>{
+    let selType=['amort','revolving','overdraft','director','other'].map(t=>
+      '<option value="'+t+'"'+(f.type===t?' selected':'')+'>'+dsTypeLabel(t)+'</option>').join('');
+    return '<tr>'+
+      '<td style="width:28px"><button class="btn sm danger" onclick="dsFacilityDelete('+i+')">✕</button></td>'+
+      '<td><input class="ds-input" value="'+esc(f.financer||'')+'" onchange="dsFacilitySet('+i+',\'financer\',this.value)"></td>'+
+      '<td><input class="ds-input" value="'+esc(f.accountNo||'')+'" onchange="dsFacilitySet('+i+',\'accountNo\',this.value)"></td>'+
+      '<td><input class="ds-input" value="'+esc(f.description||'')+'" onchange="dsFacilitySet('+i+',\'description\',this.value)"></td>'+
+      '<td><select class="ds-input" onchange="dsFacilitySet('+i+',\'type\',this.value)">'+selType+'</select></td>'+
+      '<td><input class="ds-input right" type="number" step="0.01" value="'+(f.instalment||'')+'" onchange="dsFacilitySet('+i+',\'instalment\',parseFloat(this.value)||0)"></td>'+
+      '<td><input class="ds-input" value="'+esc(f.sageNCP||'')+'" onchange="dsFacilitySet('+i+',\'sageNCP\',this.value)" placeholder="Exact Sage account name"></td>'+
+      '<td><input class="ds-input" value="'+esc(f.sageCP||'')+'" onchange="dsFacilitySet('+i+',\'sageCP\',this.value)" placeholder="Exact Sage account name"></td>'+
+      '<td><input class="ds-input" value="'+esc(f.sageInterest||'')+'" onchange="dsFacilitySet('+i+',\'sageInterest\',this.value)" placeholder="Exact Sage account name"></td>'+
+    '</tr>';
+  }).join(''):'<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--muted)">No facilities set up yet. Click + Add Facility.</td></tr>';
+
+  return '<div class="ds-section active">'+
+    '<p class="muted" style="font-size:12px;margin-bottom:10px">Set up each financing facility once. Sage account names must match exactly as they appear in the imported Balance Sheet.</p>'+
+    '<div class="btns" style="margin-bottom:12px">'+
+      '<button class="btn primary" onclick="dsFacilityAdd()">+ Add Facility</button>'+
+      '<button class="btn" onclick="mark()">💾 Save</button>'+
+    '</div>'+
+    '<div class="ds-table-wrap">'+
+      '<table>'+
+        '<thead><tr>'+
+          '<th style="width:28px"></th>'+
+          '<th style="min-width:130px">Financer</th>'+
+          '<th style="min-width:120px">Account No.</th>'+
+          '<th style="min-width:180px">Description</th>'+
+          '<th style="min-width:110px">Type</th>'+
+          '<th style="min-width:120px;text-align:right">Current Instalment</th>'+
+          '<th style="min-width:200px">Sage NCP Account</th>'+
+          '<th style="min-width:200px">Sage CP Account</th>'+
+          '<th style="min-width:200px">Sage Interest Account</th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+'</tbody>'+
+      '</table>'+
+    '</div>'+
+  '</div>';
+}
+function dsFacilityAdd(){
+  ensureClientDefaults();
+  client.facilities.push({
+    id:'fac_'+Date.now(),financer:'',accountNo:'',description:'',
+    type:'amort',instalment:0,
+    sageNCP:'',sageCP:'',sageInterest:'Interest on Instalment agreements'
+  });
+  renderDebtSchedule();
+}
+function dsFacilityDelete(i){
+  if(!confirm('Remove this facility?'))return;
+  client.facilities.splice(i,1);
+  renderDebtSchedule();
+}
+function dsFacilitySet(i,field,val){
+  if(!client.facilities[i])return;
+  client.facilities[i][field]=val;
+  // No re-render — input stays focused. mark() keeps state in sync.
+  mark();
+}
+
+// ── TAB 2: Monthly Recon ─────────────────────────────────────────────────────
+function dsBuildRecon(cur,rm){
+  let facs=dsFacilities();
+  if(!rm) return '<div class="ds-section active"><div class="warning">Set the Report Month in Settings first.</div></div>';
+  if(!facs.length) return '<div class="ds-section active"><div class="warning">No facilities set up yet. Go to the Facilities tab first.</div></div>';
+
+  let recon=dsRecon();
+  let bs=client.raw.bs.accounts||{};
+  let hasBSData=Object.keys(bs).length>0;
+
+  let allReconciled=true;
+  let rows=facs.map((f,i)=>{
+    let e=dsEntry(f.id);
+    let bsVal=bsBalForFacility(f);
+    let stmtCap=e.stmtCapital;
+    let inst=e.instalment!==null?e.instalment:f.instalment;
+    let remInst=e.remainingInstalments;
+
+    // Variance: statement capital vs BS combined NCP+CP
+    let hasStmt=stmtCap!==null;
+    let hasBS=hasBSData&&(f.sageNCP||f.sageCP);
+    let variance=hasStmt&&hasBS?stmtCap-bsVal:null;
+    let varAbs=variance!==null?Math.abs(variance):null;
+    let tl='grey';
+    if(hasStmt&&hasBS){
+      if(varAbs<1) tl='green';
+      else tl='red';
+      if(tl!=='green') allReconciled=false;
+    } else if(!hasStmt){ allReconciled=false; }
+
+    let tlSpan='<span class="tl-'+(tl==='grey'?'grey':tl==='green'?'green':'red')+'">'+
+      (tl==='grey'?'—':tl==='green'?'✓ OK':'✗ Variance')+'</span>';
+
+    // Build row — using onchange (not oninput) so full value is captured on blur/tab
+    return '<tr>'+
+      '<td style="white-space:nowrap"><b>'+esc(f.financer||'—')+'</b><br><span class="muted" style="font-size:11px">'+esc(f.accountNo||'')+'</span></td>'+
+      '<td>'+esc(f.description||'—')+'<br><span class="'+dsTypeClass(f.type)+' ds-facility-type">'+dsTypeLabel(f.type)+'</span></td>'+
+      '<td class="right">'+
+        '<input class="ds-input right" type="number" step="0.01" placeholder="Enter from statement"'+
+        ' value="'+(stmtCap!==null?stmtCap:'')+'"'+
+        ' onchange="dsSetEntry(\''+f.id+'\',\'stmtCapital\',this.value===\'\'?null:parseFloat(this.value))">'+
+      '</td>'+
+      '<td class="right">'+
+        '<input class="ds-input right" type="number" step="0.01" placeholder="e.g. 1140.47"'+
+        ' value="'+(e.stmtInterest!==null?e.stmtInterest:'')+'"'+
+        ' onchange="dsSetEntry(\''+f.id+'\',\'stmtInterest\',this.value===\'\'?null:parseFloat(this.value))">'+
+      '</td>'+
+      '<td class="right">'+
+        '<input class="ds-input right" type="number" step="0.01" placeholder="e.g. 120.00"'+
+        ' value="'+(e.stmtAdminFee!==null?e.stmtAdminFee:'')+'"'+
+        ' onchange="dsSetEntry(\''+f.id+'\',\'stmtAdminFee\',this.value===\'\'?null:parseFloat(this.value))">'+
+      '</td>'+
+      '<td class="right">'+
+        '<input class="ds-input right" type="number" step="0.01"'+
+        ' value="'+(inst||'')+'"'+
+        ' onchange="dsSetEntry(\''+f.id+'\',\'instalment\',parseFloat(this.value)||null)">'+
+      '</td>'+
+      '<td class="right">'+
+        '<input class="ds-input right" type="number" step="1" min="0" placeholder="From statement"'+
+        ' value="'+(remInst!==null?remInst:'')+'"'+
+        ' onchange="dsSetEntry(\''+f.id+'\',\'remainingInstalments\',this.value===\'\'?null:parseInt(this.value))">'+
+      '</td>'+
+      '<td class="right">'+(hasBSData&&(f.sageNCP||f.sageCP)?money(bsVal,cur):'<span class="muted">—</span>')+'</td>'+
+      '<td class="right">'+(variance!==null?('<span style="color:'+(varAbs<1?'var(--ok)':'var(--bad)')+'">'+money(variance,cur)+'</span>'):'<span class="muted">—</span>')+'</td>'+
+      '<td>'+tlSpan+'</td>'+
+    '</tr>';
+  }).join('');
+
+  let summaryMsg=allReconciled&&facs.length?
+    '<div class="ok-msg" style="margin-top:10px">✓ All facilities reconciled for '+monthLabel(rm)+' — ready to generate journal.</div>':
+    (hasBSData?'<div class="warning" style="margin-top:10px">Enter statement figures for each facility and reconcile before generating the journal.</div>':'<div class="warning" style="margin-top:10px">Import the Balance Sheet first (Import Data) to enable recon comparison.</div>');
+
+  return '<div class="ds-section active">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+      '<p class="muted" style="font-size:12px">Enter figures from each lender\'s statement for <b>'+monthLabel(rm)+'</b>. The BS column pulls from the latest imported Balance Sheet.</p>'+
+      '<button class="btn" onclick="mark()">💾 Save</button>'+
+    '</div>'+
+    '<div class="ds-table-wrap">'+
+      '<table>'+
+        '<thead><tr>'+
+          '<th style="min-width:140px">Financer</th>'+
+          '<th style="min-width:160px">Description</th>'+
+          '<th style="min-width:120px;text-align:right">Stmt Capital Bal</th>'+
+          '<th style="min-width:110px;text-align:right">Interest Charged</th>'+
+          '<th style="min-width:100px;text-align:right">Admin Fee</th>'+
+          '<th style="min-width:120px;text-align:right">Instalment</th>'+
+          '<th style="min-width:100px;text-align:right">Remaining Inst.</th>'+
+          '<th style="min-width:120px;text-align:right">BS Balance</th>'+
+          '<th style="min-width:110px;text-align:right">Variance</th>'+
+          '<th style="min-width:90px">Status</th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+'</tbody>'+
+      '</table>'+
+    '</div>'+
+    summaryMsg+
+  '</div>';
+}
+function dsSetEntry(facId,field,val){
+  ensureClientDefaults();
+  let r=dsRecon();
+  if(!r[facId])r[facId]={stmtCapital:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
+  r[facId][field]=val;
+  mark();
+  // Refresh only the recon section without full re-render to preserve focus
+  // We do a targeted status update instead of full re-render
+  // (full re-render is triggered on tab switch or explicit save)
+}
+
+// ── TAB 3: Journal ────────────────────────────────────────────────────────────
+function dsBuildJournal(cur,rm){
+  if(!rm) return '<div class="ds-section active"><div class="warning">Set the Report Month in Settings first.</div></div>';
+  let facs=dsFacilities();
+  if(!facs.length) return '<div class="ds-section active"><div class="warning">No facilities set up. Go to Facilities tab first.</div></div>';
+
+  let recon=dsRecon();
+  let bs=client.raw.bs.accounts||{};
+  let lines=[];
+  let warnings=[];
+  let dateStr=dsJournalDate(rm);
+  let ref='DebtRecon-'+rm;
+
+  facs.forEach(f=>{
+    let e=recon[f.id]||{};
+    let stmtCap=e.stmtCapital;
+    if(stmtCap===null||stmtCap===undefined){warnings.push(f.financer+' ('+f.accountNo+'): No statement balance entered.');return;}
+
+    // 1. Correct NCP + CP split to match statement balance
+    let bsNCP=num(bs[f.sageNCP]);
+    let bsCP=num(bs[f.sageCP]);
+    let bsTotal=bsNCP+bsCP;
+    let varDiff=stmtCap-bsTotal;
+
+    if(Math.abs(varDiff)>=1){
+      // Adjust the NCP account to absorb the variance (CP is driven by current year journals)
+      if(varDiff>0){
+        // BS is understated — Credit NCP (increase liability), Debit adjustment
+        if(f.sageNCP){
+          lines.push({date:dateStr,dc:'Credit',account:f.sageNCP,ref,desc:'Debt recon adjustment '+f.description,vat:'No VAT',excl:Math.abs(varDiff).toFixed(2),tax:'0.00',total:Math.abs(varDiff).toFixed(2),affect:'',comment:''});
+          lines.push({date:dateStr,dc:'Debit',account:f.sageNCP,ref,desc:'Debt recon contra '+f.description,vat:'No VAT',excl:Math.abs(varDiff).toFixed(2),tax:'0.00',total:Math.abs(varDiff).toFixed(2),affect:f.sageNCP,comment:'Recon: stmt '+stmtCap+' vs BS '+bsTotal});
+        }
+      } else {
+        // BS is overstated — Debit NCP (reduce liability)
+        if(f.sageNCP){
+          lines.push({date:dateStr,dc:'Debit',account:f.sageNCP,ref,desc:'Debt recon adjustment '+f.description,vat:'No VAT',excl:Math.abs(varDiff).toFixed(2),tax:'0.00',total:Math.abs(varDiff).toFixed(2),affect:'',comment:''});
+          lines.push({date:dateStr,dc:'Credit',account:f.sageNCP,ref,desc:'Debt recon contra '+f.description,vat:'No VAT',excl:Math.abs(varDiff).toFixed(2),tax:'0.00',total:Math.abs(varDiff).toFixed(2),affect:f.sageNCP,comment:'Recon: stmt '+stmtCap+' vs BS '+bsTotal});
+        }
+      }
+    }
+
+    // 2. Interest accrual for the month
+    let interest=e.stmtInterest||0;
+    let adminFee=e.stmtAdminFee||0;
+    let totalInterest=interest+adminFee;
+    if(totalInterest>=1&&f.sageInterest){
+      let intAccount=f.sageInterest||'Interest on Instalment agreements';
+      lines.push({date:dateStr,dc:'Debit',account:intAccount,ref,desc:'Interest '+f.description+' '+monthLabel(rm),vat:'No VAT',excl:totalInterest.toFixed(2),tax:'0.00',total:totalInterest.toFixed(2),affect:'',comment:'Interest: '+interest.toFixed(2)+' Admin: '+adminFee.toFixed(2)});
+      // Credit an interest accrual liability or the NCP account
+      let cpAcc=f.sageCP||f.sageNCP||'';
+      if(cpAcc){
+        lines.push({date:dateStr,dc:'Credit',account:cpAcc,ref,desc:'Interest accrual '+f.description+' '+monthLabel(rm),vat:'No VAT',excl:totalInterest.toFixed(2),tax:'0.00',total:totalInterest.toFixed(2),affect:intAccount,comment:''});
+      }
+    }
+  });
+
+  // Build preview table
+  let previewRows=lines.length?lines.map(l=>
+    '<tr>'+
+      '<td>'+l.date+'</td>'+
+      '<td><span style="color:'+(l.dc==='Debit'?'#1e40af':'#047857')+'">'+l.dc+'</span></td>'+
+      '<td>'+esc(l.account)+'</td>'+
+      '<td>'+esc(l.ref)+'</td>'+
+      '<td>'+esc(l.desc)+'</td>'+
+      '<td class="right">'+money(parseFloat(l.excl),cur)+'</td>'+
+      '<td>'+esc(l.comment)+'</td>'+
+    '</tr>'
+  ).join(''):'<tr><td colspan="7" style="padding:14px;text-align:center;color:var(--muted)">No journal lines — ensure statement balances are entered in the Recon tab.</td></tr>';
+
+  let warnBlock=warnings.length?
+    '<div class="warning" style="margin-bottom:10px">'+warnings.map(w=>'⚠ '+esc(w)).join('<br>')+'</div>':'';
+
+  return '<div class="ds-section active">'+
+    warnBlock+
+    '<div class="btns" style="margin-bottom:12px">'+
+      '<button class="btn primary" onclick="dsDownloadJournal()" '+(lines.length?'':'disabled')+'>⬇ Download Sage CSV</button>'+
+      '<button class="btn" onclick="dsShowTab(\'recon\')">← Back to Recon</button>'+
+    '</div>'+
+    '<div class="ds-table-wrap">'+
+      '<table>'+
+        '<thead><tr>'+
+          '<th>Date</th><th>Dr/Cr</th><th style="min-width:200px">Account</th>'+
+          '<th style="min-width:130px">Reference</th><th style="min-width:220px">Description</th>'+
+          '<th style="min-width:100px;text-align:right">Amount</th><th style="min-width:180px">Comment</th>'+
+        '</tr></thead>'+
+        '<tbody>'+previewRows+'</tbody>'+
+      '</table>'+
+    '</div>'+
+  '</div>';
+}
+
+function dsJournalDate(rm){
+  if(!rm)return '';
+  let parts=rm.split('-');
+  if(parts.length<2)return rm;
+  let yr=parseInt(parts[0]),mo=parseInt(parts[1]);
+  // Last day of the month
+  let lastDay=new Date(yr,mo,0).getDate();
+  return lastDay+'/'+String(mo).padStart(2,'0')+'/'+yr;
+}
+
+function dsDownloadJournal(){
+  ensureClientDefaults();
+  let rm=client.settings.reportMonth;
+  let facs=dsFacilities();
+  let recon=dsRecon();
+  let bs=client.raw.bs.accounts||{};
+  let dateStr=dsJournalDate(rm);
+  let ref='DebtRecon-'+rm;
+  let csvLines=[
+    'Date,Debit/Credit,Account,Reference,Description,VAT Type,Exclusive,VAT,Total,Affecting Account,Comment,Analysis Code 1,Analysis Code 2,Analysis Code 3'
+  ];
+
+  facs.forEach(f=>{
+    let e=recon[f.id]||{};
+    let stmtCap=e.stmtCapital;
+    if(stmtCap===null||stmtCap===undefined)return;
+    let bsNCP=num(bs[f.sageNCP]);
+    let bsCP=num(bs[f.sageCP]);
+    let bsTotal=bsNCP+bsCP;
+    let varDiff=stmtCap-bsTotal;
+
+    function csvRow(date,dc,acc,r,desc,excl,comment){
+      return [date,dc,'"'+acc+'"',r,'"'+desc+'"','No VAT',excl,'0.00',excl,'',(comment?'"'+comment+'"':''),'','',''].join(',');
+    }
+
+    if(Math.abs(varDiff)>=1&&f.sageNCP){
+      let adjDC=varDiff>0?'Credit':'Debit';
+      let contraDC=varDiff>0?'Debit':'Credit';
+      csvLines.push(csvRow(dateStr,adjDC,f.sageNCP,ref,'Debt recon adj '+f.description,Math.abs(varDiff).toFixed(2),''));
+      csvLines.push(csvRow(dateStr,contraDC,f.sageNCP,ref,'Debt recon contra '+f.description,Math.abs(varDiff).toFixed(2),'stmt:'+stmtCap+' bs:'+bsTotal));
+    }
+
+    let interest=e.stmtInterest||0;
+    let adminFee=e.stmtAdminFee||0;
+    let totalInterest=interest+adminFee;
+    if(totalInterest>=1&&f.sageInterest){
+      let cpAcc=f.sageCP||f.sageNCP||'';
+      csvLines.push(csvRow(dateStr,'Debit',f.sageInterest,ref,'Interest '+f.description+' '+monthLabel(rm),totalInterest.toFixed(2),'Intr:'+interest.toFixed(2)+' Admin:'+adminFee.toFixed(2)));
+      if(cpAcc)csvLines.push(csvRow(dateStr,'Credit',cpAcc,ref,'Interest accrual '+f.description,totalInterest.toFixed(2),''));
+    }
+  });
+
+  let blob=new Blob([csvLines.join('\n')],{type:'text/csv'});
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='DebtRecon_'+rm+'.csv';
+  a.click();
+}
+
+// ── TAB 4: Snapshot (client-facing) ──────────────────────────────────────────
+function dsBuildSnapshot(cur,rm){
+  if(!rm) return '<div class="ds-section active"><div class="warning">Set the Report Month in Settings first.</div></div>';
+  let facs=dsFacilities();
+  if(!facs.length) return '<div class="ds-section active"><div class="warning">No facilities set up yet.</div></div>';
+  let recon=dsRecon();
+
+  let totalCap=0,totalInst=0;
+  let rows=facs.map(f=>{
+    let e=recon[f.id]||{};
+    let cap=e.stmtCapital!==null&&e.stmtCapital!==undefined?e.stmtCapital:null;
+    let inst=e.instalment!==null&&e.instalment!==undefined?e.instalment:f.instalment;
+    let rem=e.remainingInstalments!==null&&e.remainingInstalments!==undefined?e.remainingInstalments:null;
+    if(cap===null&&!inst)return ''; // skip empty
+    if(cap!==null)totalCap+=cap;
+    if(inst)totalInst+=inst;
+    return '<tr>'+
+      '<td>'+esc(f.financer||'—')+'</td>'+
+      '<td>'+esc(f.accountNo||'—')+'</td>'+
+      '<td>'+esc(f.description||'—')+'</td>'+
+      '<td class="right">'+(cap!==null?money(cap,cur):'<span class="muted">—</span>')+'</td>'+
+      '<td class="right">'+(inst?money(inst,cur):'<span class="muted">—</span>')+'</td>'+
+      '<td class="right">'+(rem!==null?rem:'<span class="muted">—</span>')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  return '<div class="ds-section active">'+
+    '<p class="muted" style="font-size:12px;margin-bottom:10px">Client-facing snapshot for <b>'+monthLabel(rm)+'</b>. Figures from the Monthly Recon tab.</p>'+
+    '<div class="ds-table-wrap">'+
+      '<table>'+
+        '<thead><tr>'+
+          '<th style="min-width:140px">Financer</th>'+
+          '<th style="min-width:120px">Account No.</th>'+
+          '<th style="min-width:200px">Description</th>'+
+          '<th style="min-width:130px;text-align:right">Capital Balance</th>'+
+          '<th style="min-width:130px;text-align:right">Monthly Instalment</th>'+
+          '<th style="min-width:110px;text-align:right">Months Remaining</th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+
+          '<tr class="ds-sum-row">'+
+            '<td colspan="3"><b>TOTAL</b></td>'+
+            '<td class="right"><b>'+money(totalCap,cur)+'</b></td>'+
+            '<td class="right"><b>'+money(totalInst,cur)+'</b></td>'+
+            '<td></td>'+
+          '</tr>'+
+        '</tbody>'+
+      '</table>'+
+    '</div>'+
+    '<div style="margin-top:12px;display:flex;gap:10px">'+
+      '<div style="background:#f0f4ff;border:1px solid var(--line);border-radius:8px;padding:12px 20px;text-align:center">'+
+        '<div style="font-size:11px;color:var(--muted)">Total Capital Outstanding</div>'+
+        '<div style="font-size:20px;font-weight:bold">'+money(totalCap,cur)+'</div>'+
+      '</div>'+
+      '<div style="background:#f0f4ff;border:1px solid var(--line);border-radius:8px;padding:12px 20px;text-align:center">'+
+        '<div style="font-size:11px;color:var(--muted)">Total Monthly Instalments</div>'+
+        '<div style="font-size:20px;font-weight:bold">'+money(totalInst,cur)+'</div>'+
+      '</div>'+
+      '<div style="background:#f0f4ff;border:1px solid var(--line);border-radius:8px;padding:12px 20px;text-align:center">'+
+        '<div style="font-size:11px;color:var(--muted)">Active Facilities</div>'+
+        '<div style="font-size:20px;font-weight:bold">'+facs.filter(f=>{let e=dsRecon()[f.id]||{};return e.stmtCapital>0;}).length+'</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+// ── Debt Schedule QC helper (used by qcChecks) ───────────────────────────────
+function dsQCCheck(){
+  let facs=dsFacilities();
+  if(!facs.length)return null;
+  let recon=dsRecon();
+  let bs=client.raw.bs.accounts||{};
+  let hasBSData=Object.keys(bs).length>0;
+  if(!hasBSData)return null;
+  let unreconciled=facs.filter(f=>{
+    let e=recon[f.id]||{};
+    if(e.stmtCapital===null||e.stmtCapital===undefined)return true;
+    if(!f.sageNCP&&!f.sageCP)return false;
+    let bsVal=bsBalForFacility(f);
+    return Math.abs(e.stmtCapital-bsVal)>=1;
+  });
+  return {pass:unreconciled.length===0,count:unreconciled.length,names:unreconciled.map(f=>f.financer+' '+f.accountNo)};
 }
 
 // ═══════════════════════════════════════════════════════
