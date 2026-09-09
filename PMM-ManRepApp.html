@@ -4157,18 +4157,20 @@ function dsBuildFacilities(cur){
   let rows=facs.length?facs.map((f,i)=>{
     let selType=['amort','revolving','overdraft','director','other'].map(t=>
       '<option value="'+t+'"'+(f.type===t?' selected':'')+'>'+dsTypeLabel(t)+'</option>').join('');
+    let leaseCheck='<input type="checkbox" title="Flat-rate lease — amort balance drives the BS recon"'+(f.isLease?' checked':'')+' onchange="dsFacilitySet('+i+',\'isLease\',this.checked)">';
     return '<tr>'+
       '<td style="width:28px"><button class="btn sm danger" onclick="dsFacilityDelete('+i+')">✕</button></td>'+
       '<td><input class="ds-input" value="'+esc(f.financer||'')+'" onchange="dsFacilitySet('+i+',\'financer\',this.value)"></td>'+
       '<td><input class="ds-input" value="'+esc(f.accountNo||'')+'" onchange="dsFacilitySet('+i+',\'accountNo\',this.value)"></td>'+
       '<td><input class="ds-input" value="'+esc(f.description||'')+'" onchange="dsFacilitySet('+i+',\'description\',this.value)"></td>'+
       '<td><select class="ds-input" onchange="dsFacilitySet('+i+',\'type\',this.value)">'+selType+'</select></td>'+
+      '<td style="text-align:center">'+leaseCheck+'</td>'+
       '<td><input class="ds-input right" type="number" step="0.01" value="'+(f.instalment||'')+'" onchange="dsFacilitySet('+i+',\'instalment\',parseFloat(this.value)||0)"></td>'+
       '<td>'+bsSelect(i,'sageNCP',f.sageNCP)+'</td>'+
       '<td>'+bsSelect(i,'sageCP',f.sageCP)+'</td>'+
       '<td>'+plSelect(i,'sageInterest',f.sageInterest)+'</td>'+
     '</tr>';
-  }).join(''):'<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--muted)">No facilities set up yet. Click + Add Facility.</td></tr>';
+  }).join(''):'<tr><td colspan="10" style="padding:14px;text-align:center;color:var(--muted)">No facilities set up yet. Click + Add Facility.</td></tr>';
 
   let importNote=(!hasBSAccts||!hasPLAccts)?
     '<div class="warning" style="margin-bottom:10px">'+
@@ -4191,6 +4193,7 @@ function dsBuildFacilities(cur){
           '<th style="min-width:120px">Account No.</th>'+
           '<th style="min-width:180px">Description</th>'+
           '<th style="min-width:110px">Type</th>'+
+          '<th style="width:50px;text-align:center" title="Tick for flat-rate leases where the statement balance includes unearned interest">Lease</th>'+
           '<th style="min-width:120px;text-align:right">Current Instalment</th>'+
           '<th style="min-width:220px">Sage NCP Account (BS)</th>'+
           '<th style="min-width:220px">Sage CP Account (BS)</th>'+
@@ -4205,7 +4208,7 @@ function dsFacilityAdd(){
   ensureClientDefaults();
   client.facilities.push({
     id:'fac_'+Date.now(),financer:'',accountNo:'',description:'',
-    type:'amort',instalment:0,
+    type:'amort',isLease:false,instalment:0,
     sageNCP:'',sageCP:'',sageInterest:'Interest on Instalment agreements'
   });
   renderDebtSchedule();
@@ -4297,25 +4300,43 @@ function dsBuildRecon(cur,rm){
     var bsVal=bsBalForFacility(f);
     var hasStmt=stmtCap!==null;
     var hasBS=hasBSData&&(f.sageNCP||f.sageCP);
-    var variance=hasStmt&&hasBS?stmtCap-bsVal:null;
+
+    // For leases: variance = amort balance vs BS (not statement vs BS)
+    var amortBal=e.amortBalance!==null&&e.amortBalance!==undefined?e.amortBalance:null;
+    var reconBal=f.isLease?amortBal:stmtCap;
+    var variance=reconBal!==null&&hasBS?reconBal-bsVal:null;
     var varAbs=variance!==null?Math.abs(variance):null;
     var tl='grey';
-    if(hasStmt&&hasBS){
+    if(reconBal!==null&&hasBS){
       tl=varAbs<1?'green':'red';
       if(tl!=='green')allReconciled=false;
     } else if(!hasStmt){allReconciled=false;}
 
     var tlSpan='<span class="tl-'+tl+'" id="tl_'+fid+'">'+(tl==='grey'?'&mdash;':tl==='green'?'&#10003; OK':'&#10007; Variance')+'</span>';
-    var rateStr=impliedRate!==null?'<div class="ds-rate-lbl" style="font-size:10px;color:var(--muted)">'+(impliedRate*1200).toFixed(2)+'% p.a.</div>':'<div class="ds-rate-lbl" style="font-size:10px;color:var(--muted)"></div>';
+    var rateStr=impliedRate!==null&&!f.isLease?'<div class="ds-rate-lbl" style="font-size:10px;color:var(--muted)">'+(impliedRate*1200).toFixed(2)+'% p.a.</div>':'<div class="ds-rate-lbl" style="font-size:10px;color:var(--muted)"></div>';
+
+    // Closing balance cell — labelled differently for leases
+    var closingCell=
+      '<input class="ds-input right" type="number" step="0.01" placeholder="'+(f.isLease?'Statement (ref only)':'Closing balance')+'"'+
+      ' value="'+(stmtCap!==null?stmtCap:'')+'"'+
+      ' style="'+(f.isLease?'color:var(--muted)':'')+'"'+
+      ' onchange="dsSetEntry(\''+fid+'\',\'stmtCapital\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRow(\''+fid+'\')">'+
+      (f.isLease?'<div style="font-size:10px;color:var(--muted)">ref only</div>':'');
+
+    // Amort balance cell — only shown for leases
+    var amortCell=f.isLease?
+      '<input class="ds-input right" type="number" step="0.01" placeholder="From amort schedule"'+
+      ' value="'+(amortBal!==null?amortBal:'')+'"'+
+      ' onchange="dsSetEntry(\''+fid+'\',\'amortBalance\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRow(\''+fid+'\')">'+
+      '<div style="font-size:10px;color:var(--brand)">drives recon</div>'
+      :'<span class="muted" style="font-size:11px">&mdash;</span>';
 
     var fid=f.id;
     var openingCell=
       '<input class="ds-input right" type="number" step="0.01"'+
       ' value="'+(openingBal!==null&&openingBal!==undefined?openingBal:'')+'"'+
       ' placeholder="'+(priorCap!==null?'Auto '+Math.round(priorCap):'Enter opening bal')+'"'+
-      ' style="'+(openingSource==='auto'?'color:var(--muted)':'')+'"'+
-      ' onchange="dsSetEntry(\''+fid+'\',\'openingBalance\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
-      (openingSource==='auto'&&priorCap!==null?'<div style="font-size:10px;color:var(--ok)">from prior month</div>':'');
+      ' onchange="dsSetEntry(\''+fid+'\',\'openingBalance\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRow(\''+fid+'\')">';
 
     var remCell=
       '<input class="ds-input right" type="number" step="0.01" min="0"'+
@@ -4329,25 +4350,22 @@ function dsBuildRecon(cur,rm){
       '<td style="white-space:nowrap"><b>'+esc(f.financer||'&mdash;')+'</b><br><span class="muted" style="font-size:11px">'+esc(f.accountNo||'')+'</span></td>'+
       '<td>'+esc(f.description||'&mdash;')+'<br><span class="'+dsTypeClass(f.type)+' ds-facility-type">'+dsTypeLabel(f.type)+'</span></td>'+
       '<td class="right">'+openingCell+'</td>'+
-      '<td class="right">'+
-        '<input class="ds-input right" type="number" step="0.01" placeholder="Closing balance"'+
-        ' value="'+(stmtCap!==null?stmtCap:'')+'"'+
-        ' onchange="dsSetEntry(\''+fid+'\',\'stmtCapital\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
-      '</td>'+
+      '<td class="right">'+closingCell+'</td>'+
+      '<td class="right">'+amortCell+'</td>'+
       '<td class="right">'+
         '<input class="ds-input right" type="number" step="0.01" placeholder="0.00"'+
         ' value="'+(stmtInt||'')+'"'+
-        ' onchange="dsSetEntry(\''+fid+'\',\'stmtInterest\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'stmtInterest\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRow(\''+fid+'\')">'+
       '</td>'+
       '<td class="right">'+
         '<input class="ds-input right" type="number" step="0.01" placeholder="0.00"'+
         ' value="'+(stmtFee||'')+'"'+
-        ' onchange="dsSetEntry(\''+fid+'\',\'stmtAdminFee\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'stmtAdminFee\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRow(\''+fid+'\')">'+
       '</td>'+
       '<td class="right">'+
         '<input class="ds-input right" type="number" step="0.01"'+
         ' value="'+(inst||'')+'"'+
-        ' onchange="dsSetEntry(\''+fid+'\',\'instalment\',parseFloat(this.value)||null);dsRefreshRemaining(\''+fid+'\')">'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'instalment\',parseFloat(this.value)||null);dsRefreshRow(\''+fid+'\')">'+
       '</td>'+
       '<td class="right" id="rem_'+fid+'">'+remCell+'</td>'+
       '<td class="right">'+(hasBSData&&(f.sageNCP||f.sageCP)?money(bsVal,cur):'<span class="muted">&mdash;</span>')+'</td>'+
@@ -4362,10 +4380,7 @@ function dsBuildRecon(cur,rm){
                '<div class="warning" style="margin-top:10px">Import the Balance Sheet first (Import Data) to enable recon comparison.</div>');
 
   return '<div class="ds-section active">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
-      '<p class="muted" style="font-size:12px">Enter figures from each lender\'s statement for <b>'+monthLabel(rm)+'</b>. Opening balance auto-fills from prior month &mdash; override if needed. Remaining instalments are calculated from the implied interest rate.</p>'+
-      '<button class="btn" onclick="mark()">Save</button>'+
-    '</div>'+
+    '<p class="muted" style="font-size:12px;margin-bottom:10px">Enter figures from each lender\'s statement for <b>'+monthLabel(rm)+'</b>. Opening balance auto-fills from prior month &mdash; override if needed. Remaining instalments are calculated from the implied interest rate.</p>'+
     '<div class="ds-table-wrap">'+
       '<table>'+
         '<thead><tr>'+
@@ -4373,6 +4388,7 @@ function dsBuildRecon(cur,rm){
           '<th style="min-width:160px">Description</th>'+
           '<th style="min-width:120px;text-align:right">Opening Balance</th>'+
           '<th style="min-width:120px;text-align:right">Closing Balance</th>'+
+          '<th style="min-width:120px;text-align:right">Amort Balance</th>'+
           '<th style="min-width:110px;text-align:right">Interest Charged</th>'+
           '<th style="min-width:100px;text-align:right">Admin Fee</th>'+
           '<th style="min-width:120px;text-align:right">Instalment</th>'+
@@ -4441,7 +4457,9 @@ function dsRefreshRow(facId){
   var bsVal=bsBalForFacility(f);
   var hasStmt=stmtCap!==null;
   var hasBS=hasBSData&&(f.sageNCP||f.sageCP);
-  var variance=hasStmt&&hasBS?stmtCap-bsVal:null;
+  var amortBal2=e.amortBalance!==null&&e.amortBalance!==undefined?e.amortBalance:null;
+  var reconBal2=f.isLease?amortBal2:stmtCap;
+  var variance=reconBal2!==null&&hasBS?reconBal2-bsVal:null;
   var varAbs=variance!==null?Math.abs(variance):null;
 
   var varCell=document.getElementById('var_'+facId);
@@ -4454,8 +4472,8 @@ function dsRefreshRow(facId){
   }
 
   var tl='grey';
-  if(hasStmt&&hasBS) tl=varAbs<1?'green':'red';
-  else if(!hasStmt) tl='grey';
+  if(reconBal2!==null&&hasBS) tl=varAbs<1?'green':'red';
+  else if(!hasStmt&&!f.isLease) tl='grey';
   var statusCell=document.getElementById('tl_'+facId);
   if(statusCell){
     statusCell.className='tl-'+tl;
@@ -4469,7 +4487,7 @@ function dsRefreshRemaining(facId){ dsRefreshRow(facId); }
 function dsSetEntry(facId,field,val){
   ensureClientDefaults();
   var r=dsRecon();
-  if(!r[facId])r[facId]={openingBalance:null,stmtCapital:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
+  if(!r[facId])r[facId]={openingBalance:null,stmtCapital:null,amortBalance:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
   r[facId][field]=val;
   mark();
   dsRefreshRow(facId);
