@@ -1600,14 +1600,13 @@ function renderMapping(){
   ensureClientDefaults();
   let allAccounts={};
   // Primary source: raw imported data
-  Object.keys(client.raw.pl.accounts||{}).forEach(k=>{allAccounts[k]='pl'});
-  Object.keys(client.raw.pl_py.accounts||{}).forEach(k=>{if(!allAccounts[k])allAccounts[k]='pl'});
-  Object.keys(client.raw.bs.accounts||{}).forEach(k=>{if(!allAccounts[k])allAccounts[k]='bs'});
-  Object.keys(client.raw.bs_py.accounts||{}).forEach(k=>{if(!allAccounts[k])allAccounts[k]='bs'});
+  Object.keys(client.raw.pl.accounts||{}).forEach(k=>{allAccounts[k]='pl';});
+  Object.keys(client.raw.pl_py.accounts||{}).forEach(k=>{if(!allAccounts[k])allAccounts[k]='pl';});
+  Object.keys(client.raw.bs.accounts||{}).forEach(k=>{if(!allAccounts[k])allAccounts[k]='bs';});
+  Object.keys(client.raw.bs_py.accounts||{}).forEach(k=>{if(!allAccounts[k])allAccounts[k]='bs';});
   // Fallback: any account already in mappings (e.g. loaded from saved JSON)
-  // Infer type from what the mapping points to
   Object.keys(client.mappings||{}).forEach(k=>{
-    if(allAccounts[k])return; // already found via raw data
+    if(allAccounts[k])return;
     let coaId=client.mappings[k]||'';
     let coaEntry=client.reportingCOA.find(c=>c.id===coaId);
     let type=coaEntry?coaEntry.type:'';
@@ -1615,14 +1614,14 @@ function renderMapping(){
     let isBS=['asset_current','asset_noncurrent','liability_current','liability_noncurrent','equity'].includes(type);
     if(isPL)allAccounts[k]='pl';
     else if(isBS)allAccounts[k]='bs';
-    else allAccounts[k]='pl'; // default to pl for unknown
+    else allAccounts[k]='pl';
   });
 
   let unmapped=Object.keys(allAccounts).filter(k=>!client.mappings[k]);
   let unconfirmed=Object.keys(allAccounts).filter(k=>client.mappings[k]&&!client.mappingConfirmed[k]);
   let total=Object.keys(allAccounts).length;
 
-  // Build COA options grouped by section - for both PL and BS separately
+  // Build COA options grouped by section
   function coaOptGroups(kind){
     let plSections=['income','cogs','other_income','expense','other_expense'];
     let bsSections=['asset_current','asset_noncurrent','liability_current','liability_noncurrent','equity'];
@@ -1631,14 +1630,13 @@ function renderMapping(){
     relevant.forEach(sec=>{
       let lines=client.reportingCOA.filter(c=>c.type===sec&&!c.hidden);
       if(!lines.length)return;
-      html+=`<optgroup label="${COA_SECTIONS[sec]||sec}">`;
-      lines.forEach(c=>{html+=`<option value="${c.id}">${c.name}</option>`;});
+      html+='<optgroup label="'+(COA_SECTIONS[sec]||sec)+'">';
+      lines.forEach(c=>{html+='<option value="'+c.id+'">'+esc(c.name)+'</option>';});
       html+='</optgroup>';
     });
     return html;
   }
 
-  // Cache option HTML (expensive to regenerate per row)
   let plOpts=coaOptGroups('pl');
   let bsOpts=coaOptGroups('bs');
 
@@ -1646,62 +1644,77 @@ function renderMapping(){
   let searchVal=window._mappingSearch||'';
 
   let entries=Object.entries(allAccounts);
-  // Apply filter
+  // Apply tab filter (not search — search is done via CSS data attributes)
   if(filterVal==='unmapped')entries=entries.filter(([k])=>!client.mappings[k]);
   if(filterVal==='unconfirmed')entries=entries.filter(([k])=>client.mappings[k]&&!client.mappingConfirmed[k]);
   if(filterVal==='pl')entries=entries.filter(([,v])=>v==='pl');
   if(filterVal==='bs')entries=entries.filter(([,v])=>v==='bs');
-  // Apply search
-  if(searchVal)entries=entries.filter(([k])=>k.toLowerCase().includes(searchVal.toLowerCase()));
 
   let rows=entries.map(([name,kind])=>{
     let mapped=client.mappings[name]||'';
     let confirmed=client.mappingConfirmed[name];
     let deptInfo=SAGE_DEPT_MAP[name];
-    let deptBadge=deptInfo?`<span class="pill" style="background:#eef2ff;color:#3730a3;font-size:10px">${DEPARTMENTS.find(d=>d.id===deptInfo.dept)?.label||deptInfo.dept}</span>`:'<span class="muted" style="font-size:10px">—</span>';
-    let opts=(kind==='pl'?plOpts:bsOpts).replace(mapped?`value="${mapped}"`:'__NOMATCH__',mapped?`value="${mapped}" selected`:'');
+    let deptBadge=deptInfo?'<span class="pill" style="background:#eef2ff;color:#3730a3;font-size:10px">'+(DEPARTMENTS.find(d=>d.id===deptInfo.dept)||{label:deptInfo.dept}).label+'</span>':'<span class="muted" style="font-size:10px">—</span>';
+    let opts=(kind==='pl'?plOpts:bsOpts).replace(mapped?'value="'+mapped+'"':'__NOMATCH__',mapped?'value="'+mapped+'" selected':'');
     let statusBtn=mapped
       ?(confirmed
-        ?`<button class="btn sm" style="background:#ecfdf5;color:#047857;white-space:nowrap" onclick="toggleConfirm('${esc(name)}')">✓ OK</button>`
-        :`<button class="btn sm" style="background:#fffbeb;color:#b45309;white-space:nowrap" onclick="toggleConfirm('${esc(name)}')">⚠ Confirm</button>`)
-      :`<span class="muted" style="font-size:11px">Unmapped</span>`;
-    return `<tr>
-      <td style="font-size:12px">${esc(name)}</td>
-      <td style="font-size:11px;white-space:nowrap"><span class="muted">${kind.toUpperCase()}</span></td>
-      <td style="font-size:11px">${deptBadge}</td>
-      <td><select style="font-size:12px;padding:4px;width:100%;min-width:200px" onchange="setMapping('${esc(name)}','${kind}',this.value)">${opts}</select></td>
-      <td>${statusBtn}</td>
-    </tr>`;
+        ?'<button class="btn sm" style="background:#ecfdf5;color:#047857;white-space:nowrap" onclick="toggleConfirm(\''+esc(name)+'\')">✓ OK</button>'
+        :'<button class="btn sm" style="background:#fffbeb;color:#b45309;white-space:nowrap" onclick="toggleConfirm(\''+esc(name)+'\')">⚠ Confirm</button>')
+      :'<span class="muted" style="font-size:11px">Unmapped</span>';
+    // data-name attribute used for live CSS search filtering
+    return '<tr data-name="'+esc(name.toLowerCase())+'">'+
+      '<td style="font-size:12px">'+esc(name)+'</td>'+
+      '<td style="font-size:11px;white-space:nowrap"><span class="muted">'+kind.toUpperCase()+'</span></td>'+
+      '<td style="font-size:11px">'+deptBadge+'</td>'+
+      '<td><select style="font-size:12px;padding:4px;width:100%;min-width:200px" onchange="setMapping(\''+esc(name)+'\',\''+kind+'\',this.value)">'+opts+'</select></td>'+
+      '<td>'+statusBtn+'</td>'+
+    '</tr>';
   }).join('');
 
-  document.getElementById('mapping').innerHTML=`
-  <div class="panel">
-    <h2>Account Mapping</h2>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${[['all','All ('+total+')'],['unmapped','Unmapped ('+unmapped.length+')'],['unconfirmed','Pending ('+unconfirmed.length+')'],['pl','P&L only'],['bs','BS only']].map(([v,l])=>`<button class="btn sm${filterVal===v?' primary':''}" onclick="window._mappingFilter='${v}';renderMapping()">${l}</button>`).join('')}
-      </div>
-      <input placeholder="🔍 Search account name…" style="flex:1;min-width:180px;padding:6px 10px;font-size:12px" value="${esc(searchVal)}" oninput="window._mappingSearch=this.value;renderMapping()">
-    </div>
-    <p class="muted" style="margin-bottom:10px;font-size:12px">💡 Department assignments are automatic from Sage account names. Only the <b>Reporting COA</b> column needs your attention. New accounts from an import that don't match any COA line appear as "Unmapped" — either map them or leave unmapped to exclude from reports. To add a new COA line, go to <b>Reporting COA</b>.</p>
-    <div style="overflow:auto;max-height:calc(100vh - 360px);border:1px solid var(--line);border-radius:10px">
-    <table id="mappingTable">
-      <thead><tr>
-        <th style="min-width:220px">Sage Account Name</th>
-        <th style="width:50px">Source</th>
-        <th style="width:120px">Dept (Auto)</th>
-        <th style="min-width:220px">→ Reporting COA Line</th>
-        <th style="width:100px">Status</th>
-      </tr></thead>
-      <tbody>${rows||'<tr><td colspan="5" class="muted" style="padding:16px">Import P&L or Balance Sheet first, or no accounts match current filter.</td></tr>'}</tbody>
-    </table>
-    </div>
-    <div class="btns" style="margin-top:10px">
-      <button class="btn" onclick="autoMapAll()">🤖 Auto-map Unmapped</button>
-      <button class="btn" onclick="confirmAllMapped()">✓ Confirm All</button>
-      <span class="muted" style="font-size:11px;align-self:center">${total-unmapped.length}/${total} mapped · ${total-unmapped.length-unconfirmed.length} confirmed</span>
-    </div>
-  </div>`;
+  document.getElementById('mapping').innerHTML=
+  '<div class="panel">'+
+    '<h2>Account Mapping</h2>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center">'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+        [['all','All ('+total+')'],['unmapped','Unmapped ('+unmapped.length+')'],['unconfirmed','Pending ('+unconfirmed.length+')'],['pl','P&L only'],['bs','BS only']].map(function(pair){
+          var v=pair[0],l=pair[1];
+          return '<button class="btn sm'+(filterVal===v?' primary':'')+'" onclick="window._mappingFilter=\''+v+'\';renderMapping()">'+l+'</button>';
+        }).join('')+
+      '</div>'+
+      '<input id="mappingSearch" placeholder="🔍 Search account name…" style="flex:1;min-width:180px;padding:6px 10px;font-size:12px" value="'+esc(searchVal)+'" oninput="mappingSearchFilter(this.value)">'+
+    '</div>'+
+    '<p class="muted" style="margin-bottom:10px;font-size:12px">💡 Department assignments are automatic from Sage account names. Only the <b>Reporting COA</b> column needs your attention. New accounts from an import that don\'t match any COA line appear as \"Unmapped\" — either map them or leave unmapped to exclude from reports. To add a new COA line, go to <b>Reporting COA</b>.</p>'+
+    '<div style="overflow:auto;max-height:calc(100vh - 360px);border:1px solid var(--line);border-radius:10px">'+
+    '<table id="mappingTable">'+
+      '<thead><tr>'+
+        '<th style="min-width:220px">Sage Account Name</th>'+
+        '<th style="width:50px">Source</th>'+
+        '<th style="width:120px">Dept (Auto)</th>'+
+        '<th style="min-width:220px">→ Reporting COA Line</th>'+
+        '<th style="width:100px">Status</th>'+
+      '</tr></thead>'+
+      '<tbody>'+(rows||'<tr><td colspan="5" class="muted" style="padding:16px">Import P&L or Balance Sheet first, or no accounts match current filter.</td></tr>')+'</tbody>'+
+    '</table>'+
+    '</div>'+
+    '<div class="btns" style="margin-top:10px">'+
+      '<button class="btn" onclick="autoMapAll()">🤖 Auto-map Unmapped</button>'+
+      '<button class="btn" onclick="confirmAllMapped()">✓ Confirm All</button>'+
+      '<span class="muted" style="font-size:11px;align-self:center">'+(total-unmapped.length)+'/'+total+' mapped · '+(total-unmapped.length-unconfirmed.length)+' confirmed</span>'+
+    '</div>'+
+  '</div>';
+
+  // Apply any active search immediately after render (e.g. when filter button re-renders)
+  if(searchVal)mappingSearchFilter(searchVal);
+}
+
+// Search filter: hides/shows rows via display style — NO innerHTML rebuild, NO focus loss
+function mappingSearchFilter(val){
+  window._mappingSearch=val;
+  var lower=val.toLowerCase().trim();
+  var rows=document.querySelectorAll('#mappingTable tbody tr[data-name]');
+  rows.forEach(function(row){
+    row.style.display=(!lower||row.getAttribute('data-name').includes(lower))?'':'none';
+  });
 }
 function setMapping(name,kind,coaId){client.mappings[name]=coaId;client.mappingConfirmed[name]=false;}
 function toggleConfirm(name){client.mappingConfirmed[name]=!client.mappingConfirmed[name];safeRender('mapping');}
@@ -4194,92 +4207,160 @@ function dsFacilitySet(i,field,val){
 }
 
 // ── TAB 2: Monthly Recon ─────────────────────────────────────────────────────
+
+// Return prior month YYYY-MM string
+function dsPriorMonth(rm){
+  if(!rm)return null;
+  var parts=rm.split('-');
+  var yr=parseInt(parts[0]),mo=parseInt(parts[1]);
+  mo--;if(mo<1){mo=12;yr--;}
+  return yr+'-'+String(mo).padStart(2,'0');
+}
+
+// Get prior month closing capital balance for a facility (from stored recon)
+function dsPriorCapital(facId,rm){
+  var prior=dsPriorMonth(rm);
+  if(!prior)return null;
+  var priorRecon=client.debtRecon&&client.debtRecon[prior];
+  if(!priorRecon||!priorRecon[facId])return null;
+  var cap=priorRecon[facId].stmtCapital;
+  return (cap!==null&&cap!==undefined)?cap:null;
+}
+
+// Reverse-engineer remaining instalments from statement figures
+// r = implied monthly rate = totalInterest / openingBalance
+// n = -ln(1 - r*PV/PMT) / ln(1+r)  [standard remaining term formula]
+function dsCalcRemaining(openingBal,totalInterest,closingBal,instalment){
+  if(!instalment||instalment<=0)return null;
+  if(!openingBal||openingBal<=0)return null;
+  if(closingBal<=0)return 0;
+  var r=totalInterest/openingBal;
+  var n;
+  if(r<0.00001){
+    n=closingBal/instalment;
+  } else {
+    var x=1-(r*closingBal/instalment);
+    if(x<=0)return null;
+    n=-Math.log(x)/Math.log(1+r);
+  }
+  if(!isFinite(n)||n<0)return null;
+  return Math.round(n*100)/100;
+}
+
 function dsBuildRecon(cur,rm){
-  let facs=dsFacilities();
+  var facs=dsFacilities();
   if(!rm) return '<div class="ds-section active"><div class="warning">Set the Report Month in Settings first.</div></div>';
   if(!facs.length) return '<div class="ds-section active"><div class="warning">No facilities set up yet. Go to the Facilities tab first.</div></div>';
 
-  let recon=dsRecon();
-  let bs=client.raw.bs.accounts||{};
-  let hasBSData=Object.keys(bs).length>0;
+  var recon=dsRecon();
+  var bs=client.raw.bs.accounts||{};
+  var hasBSData=Object.keys(bs).length>0;
+  var allReconciled=true;
 
-  let allReconciled=true;
-  let rows=facs.map((f,i)=>{
-    let e=dsEntry(f.id);
-    let bsVal=bsBalForFacility(f);
-    let stmtCap=e.stmtCapital;
-    let inst=e.instalment!==null?e.instalment:f.instalment;
-    let remInst=e.remainingInstalments;
+  var rows=facs.map(function(f){
+    var e=dsEntry(f.id);
+    var priorCap=dsPriorCapital(f.id,rm);
+    var openingBal=e.openingBalance!==null&&e.openingBalance!==undefined?e.openingBalance:priorCap;
+    var openingSource=e.openingBalance!==null&&e.openingBalance!==undefined?'manual':'auto';
+    var stmtCap=e.stmtCapital;
+    var stmtInt=e.stmtInterest||0;
+    var stmtFee=e.stmtAdminFee||0;
+    var totalInterest=stmtInt+stmtFee;
+    var inst=e.instalment!==null&&e.instalment!==undefined?e.instalment:f.instalment;
 
-    // Variance: statement capital vs BS combined NCP+CP
-    let hasStmt=stmtCap!==null;
-    let hasBS=hasBSData&&(f.sageNCP||f.sageCP);
-    let variance=hasStmt&&hasBS?stmtCap-bsVal:null;
-    let varAbs=variance!==null?Math.abs(variance):null;
-    let tl='grey';
+    var calcRem=null;
+    var impliedRate=null;
+    if(stmtCap!==null&&openingBal&&totalInterest>0&&inst>0){
+      impliedRate=totalInterest/openingBal;
+      calcRem=dsCalcRemaining(openingBal,totalInterest,stmtCap,inst);
+    } else if(stmtCap!==null&&inst>0&&totalInterest===0){
+      calcRem=stmtCap>0?Math.round((stmtCap/inst)*100)/100:0;
+    }
+
+    var remInst=e.remainingInstalments;
+    var bsVal=bsBalForFacility(f);
+    var hasStmt=stmtCap!==null;
+    var hasBS=hasBSData&&(f.sageNCP||f.sageCP);
+    var variance=hasStmt&&hasBS?stmtCap-bsVal:null;
+    var varAbs=variance!==null?Math.abs(variance):null;
+    var tl='grey';
     if(hasStmt&&hasBS){
-      if(varAbs<1) tl='green';
-      else tl='red';
-      if(tl!=='green') allReconciled=false;
-    } else if(!hasStmt){ allReconciled=false; }
+      tl=varAbs<1?'green':'red';
+      if(tl!=='green')allReconciled=false;
+    } else if(!hasStmt){allReconciled=false;}
 
-    let tlSpan='<span class="tl-'+(tl==='grey'?'grey':tl==='green'?'green':'red')+'">'+
-      (tl==='grey'?'—':tl==='green'?'✓ OK':'✗ Variance')+'</span>';
+    var tlSpan='<span class="tl-'+tl+'">'+(tl==='grey'?'&mdash;':tl==='green'?'&#10003; OK':'&#10007; Variance')+'</span>';
+    var rateStr=impliedRate!==null?'<div style="font-size:10px;color:var(--muted)">'+(impliedRate*1200).toFixed(2)+'% p.a.</div>':'';
 
-    // Build row — using onchange (not oninput) so full value is captured on blur/tab
+    var fid=f.id;
+    var openingCell=
+      '<input class="ds-input right" type="number" step="0.01"'+
+      ' value="'+(openingBal!==null&&openingBal!==undefined?openingBal:'')+'"'+
+      ' placeholder="'+(priorCap!==null?'Auto '+Math.round(priorCap):'Enter opening bal')+'"'+
+      ' style="'+(openingSource==='auto'?'color:var(--muted)':'')+'"'+
+      ' onchange="dsSetEntry(\''+fid+'\',\'openingBalance\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
+      (openingSource==='auto'&&priorCap!==null?'<div style="font-size:10px;color:var(--ok)">from prior month</div>':'');
+
+    var remCell=
+      '<input class="ds-input right" type="number" step="0.01" min="0"'+
+      ' value="'+(remInst!==null&&remInst!==undefined?remInst:'')+'"'+
+      ' placeholder="'+(calcRem!==null?'Calc: '+calcRem.toFixed(1):'Enter manually')+'"'+
+      ' onchange="dsSetEntry(\''+fid+'\',\'remainingInstalments\',this.value===\'\'?null:parseFloat(this.value))">'+
+      (calcRem!==null&&(remInst===null||remInst===undefined)?'<div style="font-size:10px;color:var(--muted)">'+calcRem.toFixed(1)+' calculated</div>':'')+
+      rateStr;
+
     return '<tr>'+
-      '<td style="white-space:nowrap"><b>'+esc(f.financer||'—')+'</b><br><span class="muted" style="font-size:11px">'+esc(f.accountNo||'')+'</span></td>'+
-      '<td>'+esc(f.description||'—')+'<br><span class="'+dsTypeClass(f.type)+' ds-facility-type">'+dsTypeLabel(f.type)+'</span></td>'+
+      '<td style="white-space:nowrap"><b>'+esc(f.financer||'&mdash;')+'</b><br><span class="muted" style="font-size:11px">'+esc(f.accountNo||'')+'</span></td>'+
+      '<td>'+esc(f.description||'&mdash;')+'<br><span class="'+dsTypeClass(f.type)+' ds-facility-type">'+dsTypeLabel(f.type)+'</span></td>'+
+      '<td class="right">'+openingCell+'</td>'+
       '<td class="right">'+
-        '<input class="ds-input right" type="number" step="0.01" placeholder="Enter from statement"'+
+        '<input class="ds-input right" type="number" step="0.01" placeholder="Closing balance"'+
         ' value="'+(stmtCap!==null?stmtCap:'')+'"'+
-        ' onchange="dsSetEntry(\''+f.id+'\',\'stmtCapital\',this.value===\'\'?null:parseFloat(this.value))">'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'stmtCapital\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
       '</td>'+
       '<td class="right">'+
-        '<input class="ds-input right" type="number" step="0.01" placeholder="e.g. 1140.47"'+
-        ' value="'+(e.stmtInterest!==null?e.stmtInterest:'')+'"'+
-        ' onchange="dsSetEntry(\''+f.id+'\',\'stmtInterest\',this.value===\'\'?null:parseFloat(this.value))">'+
+        '<input class="ds-input right" type="number" step="0.01" placeholder="0.00"'+
+        ' value="'+(stmtInt||'')+'"'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'stmtInterest\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
       '</td>'+
       '<td class="right">'+
-        '<input class="ds-input right" type="number" step="0.01" placeholder="e.g. 120.00"'+
-        ' value="'+(e.stmtAdminFee!==null?e.stmtAdminFee:'')+'"'+
-        ' onchange="dsSetEntry(\''+f.id+'\',\'stmtAdminFee\',this.value===\'\'?null:parseFloat(this.value))">'+
+        '<input class="ds-input right" type="number" step="0.01" placeholder="0.00"'+
+        ' value="'+(stmtFee||'')+'"'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'stmtAdminFee\',this.value===\'\'?null:parseFloat(this.value));dsRefreshRemaining(\''+fid+'\')">'+
       '</td>'+
       '<td class="right">'+
         '<input class="ds-input right" type="number" step="0.01"'+
         ' value="'+(inst||'')+'"'+
-        ' onchange="dsSetEntry(\''+f.id+'\',\'instalment\',parseFloat(this.value)||null)">'+
+        ' onchange="dsSetEntry(\''+fid+'\',\'instalment\',parseFloat(this.value)||null);dsRefreshRemaining(\''+fid+'\')">'+
       '</td>'+
-      '<td class="right">'+
-        '<input class="ds-input right" type="number" step="1" min="0" placeholder="From statement"'+
-        ' value="'+(remInst!==null?remInst:'')+'"'+
-        ' onchange="dsSetEntry(\''+f.id+'\',\'remainingInstalments\',this.value===\'\'?null:parseInt(this.value))">'+
-      '</td>'+
-      '<td class="right">'+(hasBSData&&(f.sageNCP||f.sageCP)?money(bsVal,cur):'<span class="muted">—</span>')+'</td>'+
-      '<td class="right">'+(variance!==null?('<span style="color:'+(varAbs<1?'var(--ok)':'var(--bad)')+'">'+money(variance,cur)+'</span>'):'<span class="muted">—</span>')+'</td>'+
+      '<td class="right" id="rem_'+fid+'">'+remCell+'</td>'+
+      '<td class="right">'+(hasBSData&&(f.sageNCP||f.sageCP)?money(bsVal,cur):'<span class="muted">&mdash;</span>')+'</td>'+
+      '<td class="right">'+(variance!==null?'<span style="color:'+(varAbs<1?'var(--ok)':'var(--bad)')+'">'+money(variance,cur)+'</span>':'<span class="muted">&mdash;</span>')+'</td>'+
       '<td>'+tlSpan+'</td>'+
     '</tr>';
   }).join('');
 
-  let summaryMsg=allReconciled&&facs.length?
-    '<div class="ok-msg" style="margin-top:10px">✓ All facilities reconciled for '+monthLabel(rm)+' — ready to generate journal.</div>':
-    (hasBSData?'<div class="warning" style="margin-top:10px">Enter statement figures for each facility and reconcile before generating the journal.</div>':'<div class="warning" style="margin-top:10px">Import the Balance Sheet first (Import Data) to enable recon comparison.</div>');
+  var summaryMsg=allReconciled&&facs.length?
+    '<div class="ok-msg" style="margin-top:10px">All facilities reconciled for '+monthLabel(rm)+' &mdash; ready to generate journal.</div>':
+    (hasBSData?'<div class="warning" style="margin-top:10px">Enter statement figures for each facility and reconcile before generating the journal.</div>':
+               '<div class="warning" style="margin-top:10px">Import the Balance Sheet first (Import Data) to enable recon comparison.</div>');
 
   return '<div class="ds-section active">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
-      '<p class="muted" style="font-size:12px">Enter figures from each lender\'s statement for <b>'+monthLabel(rm)+'</b>. The BS column pulls from the latest imported Balance Sheet.</p>'+
-      '<button class="btn" onclick="mark()">💾 Save</button>'+
+      '<p class="muted" style="font-size:12px">Enter figures from each lender\'s statement for <b>'+monthLabel(rm)+'</b>. Opening balance auto-fills from prior month &mdash; override if needed. Remaining instalments are calculated from the implied interest rate.</p>'+
+      '<button class="btn" onclick="mark()">Save</button>'+
     '</div>'+
     '<div class="ds-table-wrap">'+
       '<table>'+
         '<thead><tr>'+
           '<th style="min-width:140px">Financer</th>'+
           '<th style="min-width:160px">Description</th>'+
-          '<th style="min-width:120px;text-align:right">Stmt Capital Bal</th>'+
+          '<th style="min-width:120px;text-align:right">Opening Balance</th>'+
+          '<th style="min-width:120px;text-align:right">Closing Balance</th>'+
           '<th style="min-width:110px;text-align:right">Interest Charged</th>'+
           '<th style="min-width:100px;text-align:right">Admin Fee</th>'+
           '<th style="min-width:120px;text-align:right">Instalment</th>'+
-          '<th style="min-width:100px;text-align:right">Remaining Inst.</th>'+
+          '<th style="min-width:130px;text-align:right">Remaining Inst.</th>'+
           '<th style="min-width:120px;text-align:right">BS Balance</th>'+
           '<th style="min-width:110px;text-align:right">Variance</th>'+
           '<th style="min-width:90px">Status</th>'+
@@ -4290,15 +4371,39 @@ function dsBuildRecon(cur,rm){
     summaryMsg+
   '</div>';
 }
+
+// Refresh just the remaining instalments cell after input changes — no full re-render
+function dsRefreshRemaining(facId){
+  var rm=client.settings.reportMonth;
+  var f=dsFacilities().find(function(x){return x.id===facId;});
+  if(!f)return;
+  var e=dsEntry(facId);
+  var priorCap=dsPriorCapital(facId,rm);
+  var openingBal=e.openingBalance!==null&&e.openingBalance!==undefined?e.openingBalance:priorCap;
+  var stmtCap=e.stmtCapital;
+  var totalInterest=(e.stmtInterest||0)+(e.stmtAdminFee||0);
+  var inst=e.instalment!==null&&e.instalment!==undefined?e.instalment:f.instalment;
+  var calcRem=null;
+  if(stmtCap!==null&&openingBal&&totalInterest>0&&inst>0){
+    calcRem=dsCalcRemaining(openingBal,totalInterest,stmtCap,inst);
+  } else if(stmtCap!==null&&inst>0&&totalInterest===0){
+    calcRem=stmtCap>0?Math.round((stmtCap/inst)*100)/100:0;
+  }
+  if(e.remainingInstalments!==null&&e.remainingInstalments!==undefined)return; // manual override in place
+  var cell=document.getElementById('rem_'+facId);
+  if(!cell)return;
+  var inp=cell.querySelector('input');
+  if(inp&&calcRem!==null)inp.placeholder='Calc: '+calcRem.toFixed(1);
+  var divs=cell.querySelectorAll('div');
+  if(divs.length>0&&calcRem!==null)divs[0].textContent=calcRem.toFixed(1)+' calculated';
+}
+
 function dsSetEntry(facId,field,val){
   ensureClientDefaults();
-  let r=dsRecon();
-  if(!r[facId])r[facId]={stmtCapital:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
+  var r=dsRecon();
+  if(!r[facId])r[facId]={openingBalance:null,stmtCapital:null,stmtInterest:null,stmtAdminFee:null,instalment:null,remainingInstalments:null};
   r[facId][field]=val;
   mark();
-  // Refresh only the recon section without full re-render to preserve focus
-  // We do a targeted status update instead of full re-render
-  // (full re-render is triggered on tab switch or explicit save)
 }
 
 // ── TAB 3: Journal ────────────────────────────────────────────────────────────
