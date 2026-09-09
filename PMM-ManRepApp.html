@@ -3,9 +3,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>PMM Management Report Engine</title>
+<!-- PMM-ManRepApp v1.1 — 2026-09-09 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>PMM Management Report Engine v1.1</title>
 <link rel="manifest" href="manifest.json">
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=1.1"></script>
 <style>
 :root{
   --ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--paper:#fff;--bg:#f4f6f8;
@@ -1790,7 +1794,12 @@ function renderCOA(){
   document.getElementById('coa').innerHTML=html;
 }
 
-function showAddCOALine(){document.getElementById('addCOAForm').style.display='block';document.getElementById('newCOAName').focus();}
+function showAddCOALine(){
+  let f=document.getElementById('addCOAForm');
+  f.style.display='block';
+  f.scrollIntoView({behavior:'smooth',block:'center'});
+  document.getElementById('newCOAName').focus();
+}
 
 function addCOALine(){
   ensureClientDefaults();
@@ -1799,12 +1808,18 @@ function addCOALine(){
   let suffix=document.getElementById('newCOAIdSuffix').value.trim()||name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
   if(!name){alert('Please enter a name.');return;}
   let id=type+'.'+suffix;
-  // Ensure unique id
   if(client.reportingCOA.find(c=>c.id===id)){
     id=id+'_'+Date.now().toString(36);
   }
   client.reportingCOA.push({id,name,type});
+  document.getElementById('newCOAName').value='';
+  document.getElementById('newCOAIdSuffix').value='';
   renderCOA();
+  // Scroll to the newly added line and re-show the form
+  setTimeout(function(){
+    let f=document.getElementById('addCOAForm');
+    if(f){f.style.display='block';f.scrollIntoView({behavior:'smooth',block:'center'});}
+  },80);
 }
 
 function renameCOALine(idx,newName){
@@ -4073,8 +4088,42 @@ function renderDebtSchedule(){
 // ── TAB 1: Facilities setup ───────────────────────────────────────────────────
 function dsBuildFacilities(cur){
   let facs=dsFacilities();
-  let typeOpts=['amort','revolving','overdraft','director','other'].map(t=>
-    '<option value="'+t+'">'+dsTypeLabel(t)+'</option>').join('');
+
+  // Build account lists from imported data
+  let bsAccounts=Object.keys(client.raw.bs.accounts||{}).sort();
+  let plAccounts=Object.keys((client.raw.pl&&client.raw.pl.accounts)||{}).sort();
+  let hasBSAccts=bsAccounts.length>0;
+  let hasPLAccts=plAccounts.length>0;
+
+  // Helper: build a <select> for a BS account field
+  function bsSelect(facIdx,field,current){
+    if(!hasBSAccts){
+      return '<input class="ds-input" value="'+esc(current||'')+'" placeholder="Import BS first — then select here" onchange="dsFacilitySet('+facIdx+',\''+field+'\',this.value)">';
+    }
+    let opts='<option value="">— select BS account —</option>'+
+      bsAccounts.map(a=>'<option value="'+esc(a)+'"'+(a===current?' selected':'')+'>'+esc(a)+'</option>').join('');
+    return '<select class="ds-input" onchange="dsFacilitySet('+facIdx+',\''+field+'\',this.value)">'+opts+'</select>';
+  }
+
+  // Helper: build a <select> for a PL account field (interest)
+  function plSelect(facIdx,field,current){
+    if(!hasPLAccts){
+      return '<input class="ds-input" value="'+esc(current||'')+'" placeholder="Import P&L first — then select here" onchange="dsFacilitySet('+facIdx+',\''+field+'\',this.value)">';
+    }
+    // Show all PL accounts but pre-filter to interest-related ones at top
+    let interestAccts=plAccounts.filter(a=>/interest/i.test(a));
+    let otherAccts=plAccounts.filter(a=>!/interest/i.test(a));
+    let grouped='<option value="">— select P&L account —</option>';
+    if(interestAccts.length){
+      grouped+='<optgroup label="Interest accounts">'+
+        interestAccts.map(a=>'<option value="'+esc(a)+'"'+(a===current?' selected':'')+'>'+esc(a)+'</option>').join('')+
+        '</optgroup>';
+    }
+    grouped+='<optgroup label="All other P&L accounts">'+
+      otherAccts.map(a=>'<option value="'+esc(a)+'"'+(a===current?' selected':'')+'>'+esc(a)+'</option>').join('')+
+      '</optgroup>';
+    return '<select class="ds-input" onchange="dsFacilitySet('+facIdx+',\''+field+'\',this.value)">'+grouped+'</select>';
+  }
 
   let rows=facs.length?facs.map((f,i)=>{
     let selType=['amort','revolving','overdraft','director','other'].map(t=>
@@ -4086,14 +4135,21 @@ function dsBuildFacilities(cur){
       '<td><input class="ds-input" value="'+esc(f.description||'')+'" onchange="dsFacilitySet('+i+',\'description\',this.value)"></td>'+
       '<td><select class="ds-input" onchange="dsFacilitySet('+i+',\'type\',this.value)">'+selType+'</select></td>'+
       '<td><input class="ds-input right" type="number" step="0.01" value="'+(f.instalment||'')+'" onchange="dsFacilitySet('+i+',\'instalment\',parseFloat(this.value)||0)"></td>'+
-      '<td><input class="ds-input" value="'+esc(f.sageNCP||'')+'" onchange="dsFacilitySet('+i+',\'sageNCP\',this.value)" placeholder="Exact Sage account name"></td>'+
-      '<td><input class="ds-input" value="'+esc(f.sageCP||'')+'" onchange="dsFacilitySet('+i+',\'sageCP\',this.value)" placeholder="Exact Sage account name"></td>'+
-      '<td><input class="ds-input" value="'+esc(f.sageInterest||'')+'" onchange="dsFacilitySet('+i+',\'sageInterest\',this.value)" placeholder="Exact Sage account name"></td>'+
+      '<td>'+bsSelect(i,'sageNCP',f.sageNCP)+'</td>'+
+      '<td>'+bsSelect(i,'sageCP',f.sageCP)+'</td>'+
+      '<td>'+plSelect(i,'sageInterest',f.sageInterest)+'</td>'+
     '</tr>';
   }).join(''):'<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--muted)">No facilities set up yet. Click + Add Facility.</td></tr>';
 
+  let importNote=(!hasBSAccts||!hasPLAccts)?
+    '<div class="warning" style="margin-bottom:10px">'+
+      (!hasBSAccts?'⚠ No Balance Sheet imported — NCP and CP dropdowns will show as text fields until you import the BS. ':'')+ 
+      (!hasPLAccts?'⚠ No P&L imported — Interest account dropdown will show as text field until you import the P&L.':'')+
+    '</div>':'';
+
   return '<div class="ds-section active">'+
-    '<p class="muted" style="font-size:12px;margin-bottom:10px">Set up each financing facility once. Sage account names must match exactly as they appear in the imported Balance Sheet.</p>'+
+    importNote+
+    '<p class="muted" style="font-size:12px;margin-bottom:10px">Set up each financing facility once. Select the matching Sage account from the dropdowns — they are populated from your imported Balance Sheet and P&L.</p>'+
     '<div class="btns" style="margin-bottom:12px">'+
       '<button class="btn primary" onclick="dsFacilityAdd()">+ Add Facility</button>'+
       '<button class="btn" onclick="mark()">💾 Save</button>'+
@@ -4107,9 +4163,9 @@ function dsBuildFacilities(cur){
           '<th style="min-width:180px">Description</th>'+
           '<th style="min-width:110px">Type</th>'+
           '<th style="min-width:120px;text-align:right">Current Instalment</th>'+
-          '<th style="min-width:200px">Sage NCP Account</th>'+
-          '<th style="min-width:200px">Sage CP Account</th>'+
-          '<th style="min-width:200px">Sage Interest Account</th>'+
+          '<th style="min-width:220px">Sage NCP Account (BS)</th>'+
+          '<th style="min-width:220px">Sage CP Account (BS)</th>'+
+          '<th style="min-width:220px">Sage Interest Account (P&L)</th>'+
         '</tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
       '</table>'+

@@ -1,11 +1,11 @@
 {
-  "name": "Tutin Management Report",
-  "short_name": "TutinManRep",
-  "description": "Monthly management reports from QuickBooks Online exports",
-  "start_url": "TutinManRep.html",
+  "name": "PMM Management Report Engine",
+  "short_name": "PMM Reports",
+  "description": "Monthly management reporting for Precision Moulding & Moulds",
+  "start_url": "PMM-ManRepApp.html",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#8B1A1A",
+  "background_color": "#ffffff",
+  "theme_color": "#1a56db",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
