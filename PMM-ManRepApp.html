@@ -80,9 +80,9 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 .warning{background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px;border-radius:8px;margin-bottom:10px}
 .ok-msg{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:10px;border-radius:8px;margin-bottom:10px}
 .kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px}
-.kpi-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
-.kpi-card .kv{font-size:20px;font-weight:bold;margin-top:4px}
-.kpi-card .kl{font-size:11px;color:var(--muted)}
+.kpi-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px 24px}
+.kpi-card .kv{font-size:36px;font-weight:bold;margin-top:6px}
+.kpi-card .kl{font-size:18px;color:var(--muted);font-weight:600}
 
 /* Budget builder */
 .budget-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:calc(100vh - 280px);background:#fff;cursor:grab}
@@ -3489,14 +3489,14 @@ function renderDashboard(){
     let sW=Math.max(2,Math.round((trendSales[i]/maxBar)*100));
     let gW=Math.max(0,Math.round((Math.max(0,trendGP[i])/maxBar)*100));
     let gpPct=trendSales[i]?trendGP[i]/trendSales[i]:0;
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <div style="width:48px;font-size:11px;color:var(--muted);text-align:right">${monthLabel(m)}</div>
-      <div style="flex:1;position:relative;height:20px;background:#f3f4f6;border-radius:4px;overflow:hidden">
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:56px;font-size:13px;color:var(--muted);text-align:right">${monthLabel(m)}</div>
+      <div style="flex:1;position:relative;height:28px;background:#f3f4f6;border-radius:4px;overflow:hidden">
         <div style="position:absolute;left:0;top:0;height:100%;width:${sW}%;background:#cbd5e1;border-radius:4px"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${gW}%;background:${trendGP[i]>=0?'var(--ok)':'var(--bad)'};border-radius:4px;opacity:0.85"></div>
       </div>
-      <div style="width:90px;font-size:11px;text-align:right">${money(trendSales[i],cur)}</div>
-      <div style="width:75px;font-size:11px;text-align:right;color:${trendGP[i]>=0?'var(--ok)':'var(--bad)'}">${pct(gpPct)}</div>
+      <div style="width:110px;font-size:13px;text-align:right">${money(trendSales[i],cur)}</div>
+      <div style="width:80px;font-size:13px;text-align:right;color:${trendGP[i]>=0?'var(--ok)':'var(--bad)'}">${pct(gpPct)}</div>
     </div>`;
   }).join('');
 
@@ -3516,13 +3516,13 @@ function renderDashboard(){
   }
   function kpi(label,val,sub,py){return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
     <div style="font-size:11px;color:var(--muted)">${label}</div>
-    <div style="font-size:22px;font-weight:bold;margin:4px 0;color:${typeof val==='string'&&val.includes('(')?'var(--bad)':'inherit'}">${val}</div>
+    <div style="font-size:30px;font-weight:bold;margin:6px 0;color:${typeof val==='string'&&val.includes('(')?'var(--bad)':'inherit'}">${val}</div>
     ${sub?`<div style="font-size:11px">${sub}</div>`:''}
     ${py?`<div style="font-size:11px;margin-top:2px">${py}</div>`:''}
   </div>`;}
 
   document.getElementById('dashboard').innerHTML=`
-  <div style="max-width:1300px">
+  <div style="max-width:1600px">
     <!-- Header -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid var(--brand)">
       <div>
@@ -3540,7 +3540,7 @@ function renderDashboard(){
     ${!hasPL?`<div class="warning" style="margin-top:12px">No P&L data imported yet. Go to <b>Import Data</b> to get started.</div>`:''}
 
     <!-- KPI row -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0">
       ${kpi('Revenue — '+monthLabel(rm), money(incCm,cur),
         `${svb(incCm,incBudCm,true)} vs Budget`,
         `${svb(incCm,incPyCm,true)} vs PY`)}
@@ -3555,7 +3555,7 @@ function renderDashboard(){
         `${svb(incYtd,incPyYtd,true)} vs PY YTD`)}
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px">
       ${kpi('GP YTD', money(gpYtd,cur),
         `${svb(gpYtd,gpBudYtd,true)} vs Budget YTD`,
         `${svb(gpYtd,gpPyYtd,true)} vs PY YTD`)}
@@ -3602,16 +3602,16 @@ function renderDashboard(){
         let targetBar=Math.min(98,Math.round((target/maxScale)*100));
         return '<div style="margin-bottom:12px">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-          +'<span style="font-size:12px;font-weight:bold;color:'+d.color+'">'+d.label+'</span>'
-          +'<span style="font-size:14px;font-weight:bold;color:'+(ok?'var(--ok)':'var(--bad)')+'">'+
+          +'<span style="font-size:16px;font-weight:bold;color:'+d.color+'">'+d.label+'</span>'
+          +'<span style="font-size:20px;font-weight:bold;color:'+(ok?'var(--ok)':'var(--bad)')+'">'+
             (ratio!==null?ratio.toFixed(2)+'x':'No data')+
             (ratioPY!==null?' <span style="font-size:11px;color:var(--muted)">(PY: '+ratioPY.toFixed(2)+'x)</span>':'')+
           '</span></div>'
           +'<div style="position:relative;height:14px;background:#f3f4f6;border-radius:4px;overflow:hidden">'
           +(ratio!==null?'<div style="position:absolute;left:0;top:0;height:100%;width:'+bar+'%;background:'+d.color+';border-radius:4px;opacity:0.75"></div>':'')
           +'</div>'
-          +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">'
-          +'<span>'+(ok?'✓ Above target':'⚠ Below target')+' ('+target.toFixed(1)+'x)</span>'
+          +'<div style="display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-top:4px">'
+          +'<span>'+(ok?'✓ Above target':'⚠ Below target')+' ('+target.toFixed(1)+'x)</span>' /* fs16 */
           +'<span>│ target at '+targetBar+'%</span>'
           +'</div>'
           +'</div>';
@@ -3633,21 +3633,21 @@ function renderDashboard(){
       let gplrBar=gplr!==null?Math.min(100,Math.round((gplr/gplrMaxScale)*100)):0;
       let gplrTargetBar=Math.min(98,Math.round((gplrTarget/gplrMaxScale)*100));
 
-      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+      return '<div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px">'
         // Conversion Rate panel
         +'<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">'
-        +'<h3 style="margin:0 0 12px;font-size:14px">Conversion Rate — '+monthLabel(rm)+'</h3>'
-        +'<p style="font-size:11px;color:var(--muted);margin-bottom:10px">Sales ÷ Raw Material Purchases | BM, IM &amp; Tubes only</p>'
+        +'<h3 style="margin:0 0 12px;font-size:20px;font-weight:bold">Conversion Rate — '+monthLabel(rm)+'</h3>'
+        +'<p style="font-size:14px;color:var(--muted);margin-bottom:10px">Sales ÷ Raw Material Purchases | BM, IM &amp; Tubes only</p>'
         +convRows
         +'</div>'
         // GPLR panel
         +'<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">'
-        +'<h3 style="margin:0 0 12px;font-size:14px">GP per Labour Rand — '+monthLabel(rm)+'</h3>'
+        +'<h3 style="margin:0 0 12px;font-size:20px;font-weight:bold">GP per Labour Rand — '+monthLabel(rm)+'</h3>'
         +'<div style="text-align:center;padding:8px 0 16px">'
         +'<div style="font-size:42px;font-weight:bold;color:'+(gplrOk?'var(--ok)':'var(--bad)')+'">'+
           (gplr!==null?gplr.toFixed(2)+'x':'No data')+
         '</div>'
-        +'<div style="font-size:12px;color:var(--muted);margin-top:4px">Target: '+gplrTarget.toFixed(1)+'x'
+        +'<div style="font-size:16px;color:var(--muted);margin-top:4px">Target: '+gplrTarget.toFixed(1)+'x'
           +(gplrPY!==null?' &nbsp;|&nbsp; PY: '+gplrPY.toFixed(2)+'x':'')
           +(gplrYtd!==null?' &nbsp;|&nbsp; YTD: '+gplrYtd.toFixed(2)+'x':'')+
         '</div></div>'
@@ -3656,7 +3656,7 @@ function renderDashboard(){
           +'<div style="position:absolute;left:0;top:0;height:100%;width:'+gplrBar+'%;background:'+(gplrOk?'var(--ok)':'var(--bad)')+';border-radius:8px;opacity:0.75"></div>'
           +'<div style="position:absolute;top:0;height:100%;width:2px;background:#374151;left:'+gplrTargetBar+'%"></div>'
           +'</div>':'')
-        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;text-align:center">'
+        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:15px;text-align:center">'
         +'<div><div style="color:var(--muted)">GP (Month)</div><div style="font-weight:bold">'+money(gpCm2,cur)+'</div></div>'
         +'<div><div style="color:var(--muted)">Labour (Month)</div><div style="font-weight:bold">'+money(labour,cur)+'</div></div>'
         +'<div><div style="color:var(--muted)">GP per R Labour</div><div style="font-weight:bold;color:'+(gplrOk?'var(--ok)':'var(--bad)')+'">'+
@@ -3667,18 +3667,18 @@ function renderDashboard(){
         +'</div>';
     })():''}
 
-    <!-- Two columns: trend + dept -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <!-- Charts — single column full width -->
+    <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px">
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">
-        <h3 style="margin:0 0 12px;font-size:14px">Revenue & GP Trend</h3>
-        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
+        <h3 style="margin:0 0 16px;font-size:20px;font-weight:bold">Revenue & GP Trend</h3>
+        <div style="display:flex;gap:24px;margin-bottom:14px;font-size:15px">
           <span><span style="display:inline-block;width:12px;height:12px;background:#cbd5e1;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Revenue</span>
           <span><span style="display:inline-block;width:12px;height:12px;background:var(--ok);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Gross Profit</span>
         </div>
         ${barRows||'<p class="muted" style="font-size:12px">Import P&L to see trend</p>'}
       </div>
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px">
-        <h3 style="margin:0 0 12px;font-size:14px">Department GP — ${monthLabel(rm)}</h3>
+        <h3 style="margin:0 0 16px;font-size:20px;font-weight:bold">Department GP — ${monthLabel(rm)}</h3>
         ${hasPL?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${deptCards}</div>`:'<p class="muted" style="font-size:12px">Import P&L to see department results</p>'}
       </div>
     </div>
@@ -3692,7 +3692,7 @@ function renderDashboard(){
       if(!hasData)return '';
       return '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
-          '<h3 style="margin:0;font-size:14px">Debt Schedule — '+monthLabel(rm)+'</h3>'+
+          '<h3 style="margin:0;font-size:20px;font-weight:bold">Debt Schedule — '+monthLabel(rm)+'</h3>'+
           '<button class="btn sm" onclick="show(\'debt_schedule\')">View Full →</button>'+
         '</div>'+
         dsSnapshotTable(cur,rm)+
