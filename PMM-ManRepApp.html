@@ -146,6 +146,10 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 .ds-table-wrap table{width:100%;border-collapse:separate;border-spacing:0}
 .ds-table-wrap thead th{position:sticky;top:0;z-index:3;background:#f9fafb;border-bottom:2px solid var(--line);padding:7px 8px;font-size:12px;white-space:nowrap;box-shadow:0 1px 0 var(--line)}
 .ds-table-wrap td{border-bottom:1px solid var(--line);padding:6px 8px;font-size:12px;vertical-align:middle}
+/* Dashboard snapshot — larger for projection */
+.ds-dash-snap .ds-table-wrap thead th{font-size:16px;padding:10px 14px}
+.ds-dash-snap .ds-table-wrap td{font-size:16px;padding:10px 14px}
+.ds-dash-snap .ds-sum-row td{font-size:17px;padding:10px 14px}
 /* Traffic lights */
 .tl-green{background:#ecfdf5;color:#047857;font-weight:bold;border-radius:6px;padding:2px 8px;font-size:11px}
 .tl-red{background:#fef2f2;color:#b91c1c;font-weight:bold;border-radius:6px;padding:2px 8px;font-size:11px}
@@ -162,6 +166,24 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 .ds-type-director{background:#f3e8ff;color:#6b21a8}
 .ds-type-other{background:#f3f4f6;color:#374151}
 
+@media screen{
+  /* Management report on-screen — larger for readability and presentation */
+  #management_report .stmt th,
+  #management_report .stmt td{font-size:15px!important;padding:8px 10px!important}
+  #management_report .stmt .indent{padding-left:28px!important}
+  #management_report h2{font-size:22px!important;margin-bottom:14px!important}
+  #management_report .report-scroll{max-height:calc(100vh - 160px)}
+  /* Debtors / Creditors age tables */
+  #management_report .kpi-grid .kpi-card .kv{font-size:22px!important}
+  #management_report .kpi-grid .kpi-card .kl{font-size:14px!important}
+  /* Debt schedule snapshot in report */
+  #management_report .ds-table-wrap thead th{font-size:15px!important;padding:10px 12px!important}
+  #management_report .ds-table-wrap td{font-size:15px!important;padding:10px 12px!important}
+  /* Dept P&L cards — larger for presentation */
+  #dept_report .dept-card-hdr{font-size:18px!important;padding:14px 18px!important}
+  #dept_report table th,#dept_report table td{font-size:15px!important;padding:7px 8px!important}
+  #dept_report .total-row td{font-size:16px!important}
+}
 @media print{
   header,nav,.no-print{display:none!important}
   .app{display:block}
@@ -175,6 +197,14 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
   .stmt .section-row td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .dept-card-hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Fix report-scroll for print — remove overflow/max-height so all rows print */
+  .report-scroll{overflow:visible!important;max-height:none!important}
+  /* Fix KPI cards in management report print — reset to compact size */
+  #management_report .stmt th,
+  #management_report .stmt td{font-size:12px!important;padding:5px 7px!important}
+  #management_report h2{font-size:16px!important}
+  /* Remove scrollbars from printed output */
+  *{overflow:visible!important;max-height:none!important}
 }
 </style>
 </head>
@@ -3055,26 +3085,27 @@ function deptGPTable(deptId,period,ytdMonths,cur){
 }
 
 function renderDeptCards(period,ytd,cur){
-  let html='<div class="dept-cards">';
-  DEPARTMENTS.forEach(dept=>{
+  let reportDepts=DEPARTMENTS.filter(function(d){return d.id==='bm'||d.id==='im'||d.id==='td';});
+  let html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
+  reportDepts.forEach(function(dept){
     let {tableHtml,gp,gpPct}=deptGPTable(dept.id,period,ytd,cur);
-    html+=`<div class="dept-card">
-      <div class="dept-card-hdr ${dept.hdrClass}">${dept.label}
-        <span style="float:right;font-size:13px;font-weight:normal">GP: ${money(gp.gp,cur)} (${pct(gpPct)})</span>
-      </div>
-      <div class="dept-card-body">${tableHtml}</div>
-    </div>`;
+    html+='<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff">'+
+      '<div class="dept-card-hdr '+dept.hdrClass+'" style="padding:14px 18px;font-size:18px;font-weight:bold;color:#fff">'+dept.label+
+        '<span style="float:right;font-size:15px;font-weight:normal">GP: '+money(gp.gp,cur)+' ('+pct(gpPct)+')</span>'+
+      '</div>'+
+      '<div style="padding:16px">'+tableHtml+'</div>'+
+    '</div>';
   });
   html+='</div>';
 
-  // Totals row
-  let totalSalesCm=DEPARTMENTS.reduce((s,d)=>s+computeDeptGP(d.id,period).sales,0);
-  let totalGPCm=DEPARTMENTS.reduce((s,d)=>s+computeDeptGP(d.id,period).gp,0);
+  // Totals summary — only the three reporting depts
+  let totalSalesCm=reportDepts.reduce(function(s,d){return s+computeDeptGP(d.id,period).sales;},0);
+  let totalGPCm=reportDepts.reduce(function(s,d){return s+computeDeptGP(d.id,period).gp;},0);
   let totalGPPct=totalSalesCm?totalGPCm/totalSalesCm:0;
-  html+=`<div style="background:var(--brand);color:#fff;border-radius:10px;padding:14px;display:flex;gap:24px;flex-wrap:wrap">
-    <div><div style="font-size:11px;opacity:.8">Total Revenue — ${monthLabel(period)}</div><div style="font-size:20px;font-weight:bold">${money(totalSalesCm,cur)}</div></div>
-    <div><div style="font-size:11px;opacity:.8">Total Gross Profit</div><div style="font-size:20px;font-weight:bold">${money(totalGPCm,cur)} (${pct(totalGPPct)})</div></div>
-  </div>`;
+  html+='<div style="background:var(--brand);color:#fff;border-radius:10px;padding:16px;display:flex;gap:32px;flex-wrap:wrap">'+
+    '<div><div style="font-size:14px;opacity:.8">Total Revenue — '+monthLabel(period)+'</div><div style="font-size:26px;font-weight:bold">'+money(totalSalesCm,cur)+'</div></div>'+
+    '<div><div style="font-size:14px;opacity:.8">Total Gross Profit</div><div style="font-size:26px;font-weight:bold">'+money(totalGPCm,cur)+' ('+pct(totalGPPct)+')</div></div>'+
+  '</div>';
   return html;
 }
 
@@ -3203,7 +3234,6 @@ function renderPPENoteContent(cur){
     let pn=client.ppeNotes[noteKey];
     let additions=num(pn.additions);
     let disposals=num(pn.disposals);
-    // Reconciliation: PY NBV + Additions - Disposals - Dep = CY NBV
     let reconClosing=nbvPY!==null?(nbvPY+additions-disposals-Math.abs(depYTD)):null;
     let reconDiff=reconClosing!==null?(nbvCY-reconClosing):null;
     let reconFlag=reconDiff!==null&&Math.abs(reconDiff)>5
@@ -3228,6 +3258,51 @@ function renderPPENoteContent(cur){
     </div>`;
   });
   return html||'<p class="muted">No PPE balances found. Import the Balance Sheet to populate.</p>';
+}
+
+// Clean print version of PPE note — no inputs or textareas
+function renderPPENoteContentPrint(cur){
+  let ppeClasses=getPPEClasses();
+  if(!ppeClasses.length)return '';
+  let hasPY=Object.keys(client.raw.bs_py.accounts||{}).length>0;
+  let html='';
+  ppeClasses.forEach(function(p){
+    let costCY=getBSValue(p.costId,true);
+    let accDepCY=getBSValue(p.accDepId,true);
+    let nbvCY=costCY-Math.abs(accDepCY);
+    let costPY=hasPY?getBSValue(p.costId,false):null;
+    let accDepPY=hasPY?getBSValue(p.accDepId,false):null;
+    let nbvPY=hasPY?(costPY-Math.abs(accDepPY)):null;
+    let depYTD=getPLYTDValue(p.depId);
+    if(!costCY&&!accDepCY&&(!hasPY||(!costPY&&!accDepPY)))return;
+    let noteKey='ppe_'+p.key;
+    if(!client.ppeNotes[noteKey])client.ppeNotes[noteKey]={additions:0,disposals:0,note:''};
+    let pn=client.ppeNotes[noteKey];
+    let additions=num(pn.additions);
+    let disposals=num(pn.disposals);
+    html+='<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)">'+
+      '<b>'+esc(p.label)+'</b>'+
+      '<table class="stmt" style="margin-top:8px">'+
+        '<thead><tr><th></th><th class="right">Cost</th><th class="right">Acc. Dep</th><th class="right">NBV</th></tr></thead>'+
+        '<tbody>';
+    if(hasPY&&nbvPY!==null){
+      html+='<tr><td>Opening balance (prior year BS)</td>'+
+        '<td class="right">'+money(costPY,cur)+'</td>'+
+        '<td class="right">('+money(Math.abs(accDepPY),cur)+')</td>'+
+        '<td class="right">'+money(nbvPY,cur)+'</td></tr>';
+    }
+    html+='<tr><td>Additions</td><td class="right">'+money(additions,cur)+'</td><td class="right">—</td><td class="right">'+money(additions,cur)+'</td></tr>';
+    html+='<tr><td>Disposals (at NBV)</td><td class="right">—</td><td class="right">—</td><td class="right">('+money(disposals,cur)+')</td></tr>';
+    html+='<tr><td>Depreciation (P&L YTD)</td><td class="right">—</td><td class="right">('+money(Math.abs(depYTD),cur)+')</td><td class="right">('+money(Math.abs(depYTD),cur)+')</td></tr>';
+    html+='<tr class="total-row"><td><b>Closing balance (current BS)</b></td>'+
+      '<td class="right"><b>'+money(costCY,cur)+'</b></td>'+
+      '<td class="right"><b>('+money(Math.abs(accDepCY),cur)+')</b></td>'+
+      '<td class="right"><b>'+money(nbvCY,cur)+'</b></td></tr>';
+    html+='</tbody></table>';
+    if(pn.note)html+='<p style="margin:6px 0 0;font-size:12px">'+esc(pn.note)+'</p>';
+    html+='</div>';
+  });
+  return html;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3514,11 +3589,11 @@ function renderDashboard(){
     if(base>=0&&actual<0)return '';
     return varBadge((actual-base)/Math.abs(base),fav);
   }
-  function kpi(label,val,sub,py){return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px">
-    <div style="font-size:11px;color:var(--muted)">${label}</div>
-    <div style="font-size:30px;font-weight:bold;margin:6px 0;color:${typeof val==='string'&&val.includes('(')?'var(--bad)':'inherit'}">${val}</div>
-    ${sub?`<div style="font-size:11px">${sub}</div>`:''}
-    ${py?`<div style="font-size:11px;margin-top:2px">${py}</div>`:''}
+  function kpi(label,val,sub,py){return `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px 24px">
+    <div style="font-size:16px;color:var(--muted);font-weight:600">${label}</div>
+    <div style="font-size:36px;font-weight:bold;margin:8px 0;color:${typeof val==='string'&&val.includes('(')?'var(--bad)':'inherit'}">${val}</div>
+    ${sub?`<div style="font-size:14px">${sub}</div>`:''}
+    ${py?`<div style="font-size:14px;margin-top:4px">${py}</div>`:''}
   </div>`;}
 
   document.getElementById('dashboard').innerHTML=`
@@ -3690,7 +3765,7 @@ function renderDashboard(){
       let recon=client.debtRecon&&client.debtRecon[rm]?client.debtRecon[rm]:{};
       let hasData=facs.some(function(f){let e=recon[f.id]||{};return e.stmtCapital!==null&&e.stmtCapital!==undefined;});
       if(!hasData)return '';
-      return '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px">'+
+      return '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px" class="ds-dash-snap">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
           '<h3 style="margin:0;font-size:20px;font-weight:bold">Debt Schedule — '+monthLabel(rm)+'</h3>'+
           '<button class="btn sm" onclick="show(\'debt_schedule\')">View Full →</button>'+
@@ -3982,6 +4057,37 @@ function renderBalanceSheet(){
   document.getElementById('balance_sheet').innerHTML=html;
 }
 
+// ── Clean print-only notes renderer (no editing controls) ────────────────────
+function renderNotesPrint(cur,rm){
+  ensureClientDefaults();ensureNoteDefaults();
+  if(!client.notes||!client.notes.length)return '<p style="color:var(--muted)">No notes added.</p>';
+  return client.notes.map(function(n){
+    let detailHtml='';
+    if(n.type==='ppe'){
+      detailHtml='<div style="margin-top:8px">'+renderPPENoteContentPrint(cur)+'</div>';
+    } else if(n.type==='breakdown'&&n.breakdown&&n.breakdown.length){
+      let ttl=n.breakdown.reduce(function(s,x){return s+num(x.val);},0);
+      detailHtml='<table style="width:100%;border-collapse:collapse;margin-top:6px">'+
+        n.breakdown.filter(function(x){return num(x.val)!==0;}).map(function(x){
+          return '<tr><td style="padding:3px 8px;padding-left:18px">'+esc(x.name)+'</td>'+
+                 '<td style="text-align:right;padding:3px 8px">'+money(x.val,cur)+'</td></tr>';
+        }).join('')+
+        '<tr style="font-weight:bold;border-top:1px solid #d1d5db">'+
+          '<td style="padding:4px 8px">Total</td>'+
+          '<td style="text-align:right;padding:4px 8px">'+money(ttl,cur)+'</td>'+
+        '</tr></table>';
+    }
+    return '<div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line)">'+
+      '<div style="display:flex;gap:12px;align-items:baseline;margin-bottom:6px">'+
+        '<span style="font-weight:bold;font-size:14px;color:var(--brand)">Note '+n.number+'</span>'+
+        '<span style="font-weight:bold;font-size:14px">'+esc(n.heading||'')+'</span>'+
+      '</div>'+
+      (n.comment?'<p style="margin:0 0 6px;font-size:13px">'+esc(n.comment)+'</p>':'')+
+      detailHtml+
+    '</div>';
+  }).join('');
+}
+
 // ═══════════════════════════════════════════════════════
 //  MANAGEMENT REPORT (Full printable — P&L + BS + Notes + AR + AP)
 // ═══════════════════════════════════════════════════════
@@ -4001,7 +4107,7 @@ function renderManagementReport(){
 
   let plHtml=document.getElementById('report').innerHTML;
   let bsHtml=document.getElementById('balance_sheet').innerHTML;
-  let notesHtml=document.getElementById('notes').innerHTML;
+  let notesHtml=renderNotesPrint(cur,rm);
   let arHtml=document.getElementById('debtors').innerHTML;
   let apHtml=document.getElementById('creditors').innerHTML;
 
@@ -4016,7 +4122,7 @@ function renderManagementReport(){
         <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)" onclick="window.print()">🖨 Print / PDF</button>
       </div>
     </div>
-    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
+    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px" class="no-print">
       💡 <b>Print to PDF:</b> Use landscape orientation, set margins to narrow, and enable "Background graphics" for best results.
     </div>
 
