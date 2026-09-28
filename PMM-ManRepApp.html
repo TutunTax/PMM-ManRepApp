@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<!-- PMM-ManRepApp v1.1 — 2026-09-09 -->
+<!-- PMM-ManRepApp v1.2 — 2026-09-28 -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>PMM Management Report Engine v1.1</title>
+<title>PMM Management Report Engine v1.2</title>
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=1.1"></script>
 <style>
@@ -211,7 +211,7 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 <body>
 <header>
   <div>
-    <h1>PMM Management Report Engine <small>v1.1</small></h1>
+    <h1>PMM Management Report Engine <small>v1.2</small></h1>
   </div>
   <div class="hdr-right">
     <span class="save-state" id="saveState">No file loaded</span>
@@ -1975,6 +1975,29 @@ function computeDeptGP(deptId,period,rawData){
   return {sales,openingStock,purchases,closingStock,wages,consumables,r_and_m,cosDirect,cos,gp:sales-cos};
 }
 
+// Departments that share PMM's pooled costs, and get a slice of PMM (Shared)'s
+// COS apportioned to them in proportion to their turnover for the period.
+const SHARED_APPORTION_DEPTS=['im','bm','tr','td'];
+
+// Apportion PMM (Shared) COS across IM / BM / TR / TD in the ratio each
+// department contributed to that month's turnover.
+function computeSharedApportionment(period){
+  let turnovers={};
+  let totalTurnover=0;
+  SHARED_APPORTION_DEPTS.forEach(id=>{
+    let t=computeDeptGP(id,period).sales;
+    turnovers[id]=t;
+    totalTurnover+=t;
+  });
+  let sharedCos=computeDeptGP('pmm',period).cos;
+  let apportioned={};
+  SHARED_APPORTION_DEPTS.forEach(id=>{
+    let ratio=totalTurnover?turnovers[id]/totalTurnover:0;
+    apportioned[id]=sharedCos*ratio;
+  });
+  return {turnovers,totalTurnover,sharedCos,apportioned};
+}
+
 // ═══════════════════════════════════════════════════════
 //  BUDGET BUILDER (Overall COA)
 // ═══════════════════════════════════════════════════════
@@ -3046,7 +3069,28 @@ function renderDeptReport(){
 
 function deptGPTable(deptId,period,ytdMonths,cur){
   let gp=computeDeptGP(deptId,period);
-  let gpYtd=ytdMonths.reduce((acc,m)=>{let g=computeDeptGP(deptId,m);acc.sales+=g.sales;acc.cos+=g.cos;acc.gp+=g.gp;return acc;},{sales:0,cos:0,gp:0});
+  let isApportioned=SHARED_APPORTION_DEPTS.includes(deptId);
+  let apportioned=isApportioned?(computeSharedApportionment(period).apportioned[deptId]||0):0;
+
+  // YTD: sum every COS component (and the shared apportionment) across the
+  // year-to-date months — previously only Sales was summed here.
+  let gpYtd=ytdMonths.reduce((acc,m)=>{
+    let g=computeDeptGP(deptId,m);
+    let ap=isApportioned?(computeSharedApportionment(m).apportioned[deptId]||0):0;
+    acc.sales+=g.sales;
+    acc.openingStock+=g.openingStock;
+    acc.purchases+=g.purchases;
+    acc.closingStock+=g.closingStock;
+    acc.wages+=g.wages;
+    acc.consumables+=g.consumables;
+    acc.r_and_m+=g.r_and_m;
+    acc.cosDirect+=g.cosDirect;
+    acc.apportioned+=ap;
+    acc.cos+=g.cos+ap;
+    acc.gp+=g.gp-ap;
+    return acc;
+  },{sales:0,openingStock:0,purchases:0,closingStock:0,wages:0,consumables:0,r_and_m:0,cosDirect:0,apportioned:0,cos:0,gp:0});
+
   let bud={
     sales:getDeptBudget(deptId,'sales',period),
     wages:getDeptBudget(deptId,'wages',period),
@@ -3056,21 +3100,26 @@ function deptGPTable(deptId,period,ytdMonths,cur){
   };
   let budCos=bud.wages+bud.purchases+bud.consumables+bud.r_and_m;
   let budGP=bud.sales-budCos;
-  let gpVarPct=budGP?((gp.gp-budGP)/Math.abs(budGP)):null;
-  let gpPct=gp.sales?gp.gp/gp.sales:0;
+  // Gross profit after this department's share of PMM (Shared) COS
+  let gpAdj=gp.gp-apportioned;
+  let gpVarPct=budGP?((gpAdj-budGP)/Math.abs(budGP)):null;
+  let gpPct=gp.sales?gpAdj/gp.sales:0;
   let gpPctYtd=gpYtd.sales?gpYtd.gp/gpYtd.sales:0;
   let budGpPct=bud.sales?budGP/bud.sales:0;
 
   let rows=[
     ['Sales',gp.sales,bud.sales,gpYtd.sales],
-    ['Opening Stock',gp.openingStock,0,0],
-    ['Purchases / COS',gp.purchases,bud.purchases,0],
-    ['Closing Stock',-gp.closingStock,0,0],
-    ['Wages & Labour',gp.wages,bud.wages,0],
-    ['Consumables',gp.consumables,bud.consumables,0],
-    ['Repairs & Maint.',gp.r_and_m,bud.r_and_m,0],
-    ['Other COS',gp.cosDirect,0,0],
+    ['Opening Stock',gp.openingStock,0,gpYtd.openingStock],
+    ['Purchases / COS',gp.purchases,bud.purchases,gpYtd.purchases],
+    ['Closing Stock',-gp.closingStock,0,-gpYtd.closingStock],
+    ['Wages & Labour',gp.wages,bud.wages,gpYtd.wages],
+    ['Consumables',gp.consumables,bud.consumables,gpYtd.consumables],
+    ['Repairs & Maint.',gp.r_and_m,bud.r_and_m,gpYtd.r_and_m],
+    ['Other COS',gp.cosDirect,0,gpYtd.cosDirect],
   ];
+  if(isApportioned){
+    rows.push(['Shared / Apportioned (PMM)',apportioned,0,gpYtd.apportioned]);
+  }
 
   let tableHtml=`<table><thead><tr><th>Line</th><th class="right">Actual</th><th class="right">Budget</th><th class="right">Var</th><th class="right">YTD</th></tr></thead><tbody>`;
   rows.forEach(([lbl,act,bud2,ytd2])=>{
@@ -3078,29 +3127,32 @@ function deptGPTable(deptId,period,ytdMonths,cur){
     tableHtml+=`<tr><td>${lbl}</td><td class="right">${money(act,cur)}</td><td class="right">${bud2?money(bud2,cur):'—'}</td><td class="right">${var2!==null?varBadge(var2,lbl==='Sales'?true:false):'—'}</td><td class="right">${ytd2?money(ytd2,cur):'—'}</td></tr>`;
   });
   let varBadgeHtml=gpVarPct!==null?varBadge(gpVarPct,true):'—';
-  tableHtml+=`<tr class="total-row"><td><b>Gross Profit</b></td><td class="right"><b>${money(gp.gp,cur)}</b></td><td class="right"><b>${budGP?money(budGP,cur):'—'}</b></td><td class="right">${varBadgeHtml}</td><td class="right"><b>${money(gpYtd.gp,cur)}</b></td></tr>`;
+  tableHtml+=`<tr class="total-row"><td><b>Gross Profit</b></td><td class="right"><b>${money(gpAdj,cur)}</b></td><td class="right"><b>${budGP?money(budGP,cur):'—'}</b></td><td class="right">${varBadgeHtml}</td><td class="right"><b>${money(gpYtd.gp,cur)}</b></td></tr>`;
   tableHtml+=`<tr class="muted"><td style="font-style:italic">GP %</td><td class="right" style="font-style:italic">${pct(gpPct)}</td><td class="right" style="font-style:italic">${pct(budGpPct)}</td><td></td><td class="right" style="font-style:italic">${pct(gpPctYtd)}</td></tr>`;
   tableHtml+='</tbody></table>';
-  return {tableHtml,gp,gpYtd,bud,budGP,gpVarPct,gpPct,gpPctYtd};
+  return {tableHtml,gp,gpYtd,bud,budGP,gpVarPct,gpPct,gpPctYtd,gpAdj,apportioned};
 }
 
 function renderDeptCards(period,ytd,cur){
-  let reportDepts=DEPARTMENTS.filter(function(d){return d.id==='bm'||d.id==='im'||d.id==='td';});
-  let html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
+  let reportDepts=DEPARTMENTS.filter(function(d){return d.id==='bm'||d.id==='im'||d.id==='tr'||d.id==='td';});
+  let html='<div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">';
+  let cardGP={};
   reportDepts.forEach(function(dept){
-    let {tableHtml,gp,gpPct}=deptGPTable(dept.id,period,ytd,cur);
+    let {tableHtml,gp,gpPct,gpAdj}=deptGPTable(dept.id,period,ytd,cur);
+    cardGP[dept.id]=gpAdj;
     html+='<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff">'+
       '<div class="dept-card-hdr '+dept.hdrClass+'" style="padding:14px 18px;font-size:18px;font-weight:bold;color:#fff">'+dept.label+
-        '<span style="float:right;font-size:15px;font-weight:normal">GP: '+money(gp.gp,cur)+' ('+pct(gpPct)+')</span>'+
+        '<span style="float:right;font-size:15px;font-weight:normal">GP: '+money(gpAdj,cur)+' ('+pct(gpPct)+')</span>'+
       '</div>'+
       '<div style="padding:16px">'+tableHtml+'</div>'+
     '</div>';
   });
   html+='</div>';
 
-  // Totals summary — only the three reporting depts
+  // Totals summary — the four reporting depts, after each one's share of
+  // PMM (Shared) COS has been apportioned in
   let totalSalesCm=reportDepts.reduce(function(s,d){return s+computeDeptGP(d.id,period).sales;},0);
-  let totalGPCm=reportDepts.reduce(function(s,d){return s+computeDeptGP(d.id,period).gp;},0);
+  let totalGPCm=reportDepts.reduce(function(s,d){return s+cardGP[d.id];},0);
   let totalGPPct=totalSalesCm?totalGPCm/totalSalesCm:0;
   html+='<div style="background:var(--brand);color:#fff;border-radius:10px;padding:16px;display:flex;gap:32px;flex-wrap:wrap">'+
     '<div><div style="font-size:14px;opacity:.8">Total Revenue — '+monthLabel(period)+'</div><div style="font-size:26px;font-weight:bold">'+money(totalSalesCm,cur)+'</div></div>'+
