@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<!-- PMM-ManRepApp v1.2 — 2026-09-28 -->
+<!-- PMM-ManRepApp v1.13 — 2026-09-30 -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>PMM Management Report Engine v1.2</title>
+<title>PMM Management Report Engine v1.13</title>
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=1.1"></script>
 <style>
@@ -211,7 +211,7 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 <body>
 <header>
   <div>
-    <h1>PMM Management Report Engine <small>v1.2</small></h1>
+    <h1>PMM Management Report Engine <small>v1.13</small></h1>
   </div>
   <div class="hdr-right">
     <span class="save-state" id="saveState">No file loaded</span>
@@ -289,14 +289,30 @@ th{background:#f9fafb;font-weight:bold;color:#374151}
 // ═══════════════════════════════════════════════════════
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// TDA Extrusion is merged into Tube Department (see SAGE_DEPT_MAP below —
+// every TDA-tagged Sage account now maps to dept 'td'), per Johan's
+// instruction that these should always be combined, so it has no entry of
+// its own here.
+//
+// 'pmm' (PMM Shared) stays in this list because it's still a real Sage
+// department-tag — needed for computeDeptGP('pmm',...), the mapping-screen
+// department badges, and its own Budget entry tab — but it is NOT a
+// reporting department: it's the shared cost pool that gets apportioned
+// into bm/im/tr/td (SHARED_APPORTION_DEPTS), so any place that lists "the
+// departments" for reporting (Dept Cards, Dept Columns, Consolidated
+// Table, GP Trend, the Dashboard's department panels) filters it out.
 const DEPARTMENTS=[
   {id:'bm',  label:'Blow Moulding',     color:'var(--bm)',  hdrClass:'dept-hdr-bm'},
   {id:'im',  label:'Injection Moulding',color:'var(--im)',  hdrClass:'dept-hdr-im'},
   {id:'tr',  label:'Toolroom',          color:'var(--tr)',  hdrClass:'dept-hdr-tr'},
   {id:'td',  label:'Tube Department',   color:'var(--td)',  hdrClass:'dept-hdr-td'},
-  {id:'tda', label:'TDA Extrusion',     color:'var(--tda)', hdrClass:'dept-hdr-tda'},
   {id:'pmm', label:'PMM (Shared)',      color:'var(--pmm)', hdrClass:'dept-hdr-pmm'},
 ];
+// Reporting departments: every DEPARTMENTS entry that actually gets its
+// own Dept Card / column / row — i.e. everything except PMM (Shared).
+// (Filtered by id here, not by SHARED_APPORTION_DEPTS, because that const
+// is declared later in the file and isn't available yet at this point.)
+const REPORT_DEPARTMENTS=DEPARTMENTS.filter(d=>d.id!=='pmm');
 
 // Sage account name → department assignment
 // Accounts not listed here go into a general/consolidated bucket
@@ -306,7 +322,7 @@ const SAGE_DEPT_MAP={
   'Sales - Injection Moulding':   {dept:'im',  role:'sales'},
   'Sales - Toolroom':             {dept:'tr',  role:'sales'},
   'Sales - Dispensing Tubes':     {dept:'td',  role:'sales'},
-  'Sales - Extrusion':            {dept:'tda', role:'sales'},
+  'Sales - Extrusion':            {dept:'td', role:'sales'},
   'Sales - PMM':                  {dept:'pmm', role:'sales'},
   'Sales':                        {dept:'pmm', role:'sales'},
   'Sales - Raw Material':         {dept:'pmm', role:'sales'},
@@ -317,14 +333,14 @@ const SAGE_DEPT_MAP={
   'Opening Stock - Blow Moulding':{dept:'bm',  role:'opening_stock'},
   'Opening Stock - Injection Moulding':{dept:'im',role:'opening_stock'},
   'Opening Stock - Dispensing Tubes':{dept:'td',role:'opening_stock'},
-  'Opening Stock - TDA':          {dept:'tda', role:'opening_stock'},
+  'Opening Stock - TDA':          {dept:'td', role:'opening_stock'},
   'Opening Stock (Shared)':       {dept:'pmm', role:'opening_stock'},
   // Purchases
   'Purchases - Blow Moulding':    {dept:'bm',  role:'purchases'},
   'Purchases - Injection Moulding':{dept:'im', role:'purchases'},
   'Purchases - Toolroom':         {dept:'tr',  role:'purchases'},
   'Purchases - Dispensing Tubes':{dept:'td',  role:'purchases'},
-  'Purchases - Extrusion':        {dept:'tda', role:'purchases'},
+  'Purchases - Extrusion':        {dept:'td', role:'purchases'},
   'Purchases - PMM':              {dept:'pmm', role:'purchases'},
   'Purchases - Raw Material':     {dept:'pmm', role:'purchases'},
   'Purchases':                    {dept:'pmm', role:'purchases'},
@@ -338,7 +354,7 @@ const SAGE_DEPT_MAP={
   'Closing Stock - Blow Moulding':{dept:'bm',  role:'closing_stock'},
   'Closing Stock - Injection Moulding':{dept:'im',role:'closing_stock'},
   'Closing Stock - Dispensing Tubes':{dept:'td',role:'closing_stock'},
-  'Closing Stock TDA':            {dept:'tda', role:'closing_stock'},
+  'Closing Stock TDA':            {dept:'td', role:'closing_stock'},
   'Closing Stock (Shared)':       {dept:'pmm', role:'closing_stock'},
   // Wages & Labour
   'Wages - Blow Moulding':        {dept:'bm',  role:'wages'},
@@ -348,7 +364,7 @@ const SAGE_DEPT_MAP={
   'Wages - Toolroom':             {dept:'tr',  role:'wages'},
   'Overtime - Toolroom':          {dept:'tr',  role:'wages'},
   'Wages - Tube Department':      {dept:'td',  role:'wages'},
-  'Wages - TDA Extrusion':        {dept:'tda', role:'wages'},
+  'Wages - TDA Extrusion':        {dept:'td', role:'wages'},
   'Wages - PMM':                  {dept:'pmm', role:'wages'},
   'Overtime - PMM':               {dept:'pmm', role:'wages'},
   'Wages - Shared in Production': {dept:'pmm', role:'wages'},
@@ -365,11 +381,11 @@ const SAGE_DEPT_MAP={
   'Consumables':                  {dept:'pmm', role:'consumables'},
   'Consumables - PMM':            {dept:'pmm', role:'consumables'},
   // Repairs & Maintenance
-  'Repair & Maintenance - Blow Moulding ':{dept:'bm',role:'r_and_m'},
+  'Repair & Maintenance - Blow Moulding':{dept:'bm',role:'r_and_m'},
   'Repair & Maintenance - Injection Moulding':{dept:'im',role:'r_and_m'},
   'Repair & Maintenance - Tool Room':{dept:'tr',role:'r_and_m'},
   'Repair & Maintenance - Tube Department':{dept:'td',role:'r_and_m'},
-  'Repair & Maintenance - TDA Extrusion':{dept:'tda',role:'r_and_m'},
+  'Repair & Maintenance - TDA Extrusion':{dept:'td', role:'r_and_m'},
   'Repair & Maintenance - PMM':   {dept:'pmm', role:'r_and_m'},
   'Repairs & Maintenance':        {dept:'pmm', role:'r_and_m'},
   // COS direct
@@ -379,55 +395,102 @@ const SAGE_DEPT_MAP={
   'Cost of Sale - Tool Room':     {dept:'tr',  role:'cos_direct'},
   'Cost of Sales - Toolroom':     {dept:'tr',  role:'cos_direct'},
   'Cost of Sales - Tube Department':{dept:'td',role:'cos_direct'},
-  'Cost of Sales - TDA':          {dept:'tda', role:'cos_direct'},
+  'Cost of Sales - TDA':          {dept:'td', role:'cos_direct'},
   'Cost of Sales - PMM':          {dept:'pmm', role:'cos_direct'},
 };
 
+// The fixed set of dept-cost roles a Sage account can be tagged with — each
+// one is a line on the Dept P&L (Sales, Opening Stock, Purchases / COS,
+// Closing Stock, Wages & Labour, Consumables, Repairs & Maint., Other COS).
+const DEPT_ROLES=[
+  ['sales','Sales'],['opening_stock','Opening Stock'],['purchases','Purchases / COS'],
+  ['closing_stock','Closing Stock'],['wages','Wages & Labour'],['consumables','Consumables'],
+  ['r_and_m','Repairs & Maint.'],['cos_direct','Other COS'],
+];
+
+// SAGE_DEPT_MAP plus any per-account overrides made on the Account Mapping
+// screen (client.deptOverrides), giving the department/role every Sage
+// account is CURRENTLY tagged with. Always read department/role through
+// this — never SAGE_DEPT_MAP directly — so an override actually takes
+// effect everywhere (getDeptValue, the dept badges, PMM's shared-cost
+// apportionment). An override of {dept:'',role:''} removes the account
+// from department tracking entirely, same as never having been in
+// SAGE_DEPT_MAP.
+function effectiveDeptMap(){
+  let m={...SAGE_DEPT_MAP};
+  Object.entries(client.deptOverrides||{}).forEach(([name,ov])=>{
+    if(ov&&ov.dept&&ov.role)m[name]={dept:ov.dept,role:ov.role};
+    else delete m[name];
+  });
+  return m;
+}
+function setDeptOverride(name,field,value){
+  ensureClientDefaults();
+  let cur=client.deptOverrides[name];
+  if(!cur){
+    let base=SAGE_DEPT_MAP[name]||{dept:'',role:''};
+    cur={dept:base.dept||'',role:base.role||''};
+  }
+  cur={...cur,[field]:value};
+  client.deptOverrides[name]=cur;
+  safeRender('mapping');
+}
+function clearDeptOverride(name){
+  delete client.deptOverrides[name];
+  safeRender('mapping');
+}
+
 // Reporting COA for the overall P&L
+// Default waterfall groups (Johan's structure, editable per client in Settings/COA)
+const DEFAULT_REPORTING_GROUPS=['Income','Direct Cost of Sales','Operating Expenses','Administrative Expenses','Other Income','Other Expenses'];
+
 const REPORTING_COA=[
-  {id:'income.sales',name:'Sales',type:'income'},
-  {id:'income.discounts',name:'Discounts Allowed',type:'income'},
-  {id:'income.other',name:'Other Sales / Buy-outs',type:'income'},
-  {id:'cogs.opening_stock',name:'Opening Stock',type:'cogs',pinnedCogs:'first'},
-  {id:'cogs.purchases',name:'Purchases / COS',type:'cogs'},
-  {id:'cogs.wages',name:'Direct Wages & Labour',type:'cogs'},
-  {id:'cogs.consumables',name:'Consumables',type:'cogs'},
-  {id:'cogs.r_and_m',name:'Repairs & Maintenance',type:'cogs'},
-  {id:'cogs.cos_direct',name:'COS Direct',type:'cogs'},
-  {id:'cogs.closing_stock',name:'Closing Stock',type:'cogs',pinnedCogs:'last'},
-  {id:'other_income.interest_received',name:'Interest Received',type:'other_income'},
-  {id:'other_income.discounts_received',name:'Discount Received',type:'other_income'},
-  {id:'other_income.etd_deduction',name:'ETI Deduction',type:'other_income'},
-  {id:'other_income.recoveries',name:'Recoveries / Other',type:'other_income'},
-  {id:'expense.accounting_fees',name:'Accounting Fees',type:'expense'},
-  {id:'expense.advertising',name:'Advertising',type:'expense'},
-  {id:'expense.bank_charges',name:'Bank Charges',type:'expense'},
-  {id:'expense.cleaning',name:'Cleaning',type:'expense'},
-  {id:'expense.computer_expenses',name:'Computer Expenses',type:'expense'},
-  {id:'expense.courier',name:'Courier & Delivery',type:'expense'},
-  {id:'expense.director_remuneration',name:'Director Remuneration',type:'expense'},
-  {id:'expense.electricity',name:'Electricity & Solar',type:'expense'},
-  {id:'expense.entertainment',name:'Entertainment',type:'expense'},
-  {id:'expense.fuel',name:'Fuel',type:'expense'},
-  {id:'expense.insurance',name:'Insurance',type:'expense'},
-  {id:'expense.legal_fees',name:'Legal Fees',type:'expense'},
-  {id:'expense.motor_vehicle',name:'Motor Vehicle Expenses',type:'expense'},
-  {id:'expense.printing_stationery',name:'Printing & Stationery',type:'expense'},
-  {id:'expense.rent',name:'Rent',type:'expense'},
-  {id:'expense.salaries_wages',name:'Salaries & Wages',type:'expense'},
-  {id:'expense.security',name:'Security',type:'expense'},
-  {id:'expense.staff_welfare',name:'Staff Welfare',type:'expense'},
-  {id:'expense.subscription',name:'Subscriptions & Memberships',type:'expense'},
-  {id:'expense.telephone_internet',name:'Telephone & Internet',type:'expense'},
-  {id:'expense.training',name:'Training & PPE',type:'expense'},
-  {id:'expense.travel',name:'Travel & Accommodation',type:'expense'},
-  {id:'expense.water',name:'Water & Sanitation',type:'expense'},
-  {id:'other_expense.interest_paid',name:'Interest Paid',type:'other_expense'},
-  {id:'other_expense.depreciation',name:'Depreciation',type:'other_expense'},
-  {id:'other_expense.bad_debts',name:'Bad Debts',type:'other_expense'},
-  {id:'other_expense.forex',name:'Forex Gains/Losses',type:'other_expense'},
-  {id:'other_expense.fines',name:'Fines & Penalties',type:'other_expense'},
-  {id:'other_expense.income_tax',name:'Income Tax',type:'other_expense'},
+  {id:'income.sales',name:'Sales',type:'income',waterfallGroup:'Income',apportionMethod:'direct'},
+  {id:'income.discounts',name:'Discounts Allowed',type:'income',waterfallGroup:'Income',apportionMethod:'direct'},
+  {id:'income.other',name:'Other Sales / Buy-outs',type:'income',waterfallGroup:'Income',apportionMethod:'direct'},
+  {id:'cogs.opening_stock',name:'Opening Stock',type:'cogs',pinnedCogs:'first',waterfallGroup:'Direct Cost of Sales',apportionMethod:'direct'},
+  {id:'cogs.purchases',name:'Purchases / COS',type:'cogs',waterfallGroup:'Direct Cost of Sales',apportionMethod:'direct'},
+  {id:'cogs.wages',name:'Direct Wages & Labour',type:'cogs',waterfallGroup:'Direct Cost of Sales',apportionMethod:'direct'},
+  {id:'cogs.consumables',name:'Consumables',type:'cogs',waterfallGroup:'Direct Cost of Sales',apportionMethod:'direct'},
+  {id:'cogs.r_and_m',name:'Repairs & Maintenance',type:'cogs',waterfallGroup:'Operating Expenses',apportionMethod:'direct'},
+  {id:'cogs.cos_direct',name:'COS Direct',type:'cogs',waterfallGroup:'Direct Cost of Sales',apportionMethod:'direct'},
+  {id:'cogs.closing_stock',name:'Closing Stock',type:'cogs',pinnedCogs:'last',waterfallGroup:'Direct Cost of Sales',apportionMethod:'direct'},
+  {id:'other_income.interest_received',name:'Interest Received',type:'other_income',waterfallGroup:'Other Income',apportionMethod:'gp'},
+  {id:'other_income.discounts_received',name:'Discount Received',type:'other_income',waterfallGroup:'Other Income',apportionMethod:'gp'},
+  {id:'other_income.etd_deduction',name:'ETI Deduction',type:'other_income',waterfallGroup:'Other Income',apportionMethod:'gp'},
+  {id:'other_income.recoveries',name:'Recoveries / Other',type:'other_income',waterfallGroup:'Other Income',apportionMethod:'gp'},
+  {id:'expense.accounting_fees',name:'Accounting Fees',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.advertising',name:'Advertising',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.bank_charges',name:'Bank Charges',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.cleaning',name:'Cleaning',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.computer_expenses',name:'Computer Expenses',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.courier',name:'Courier & Delivery',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'gp'},
+  {id:'expense.director_remuneration',name:'Director Remuneration',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'gp'},
+  {id:'expense.electricity',name:'Electricity & Solar',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'consumption'},
+  {id:'expense.entertainment',name:'Entertainment',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.fuel',name:'Fuel',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.insurance',name:'Insurance',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.legal_fees',name:'Legal Fees',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.motor_vehicle',name:'Motor Vehicle Expenses',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.printing_stationery',name:'Printing & Stationery',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.rent',name:'Rent',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'area'},
+  {id:'expense.salaries_wages',name:'Salaries & Wages',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'gp'},
+  {id:'expense.security',name:'Security',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'gp'},
+  {id:'expense.staff_welfare',name:'Staff Welfare',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.subscription',name:'Subscriptions & Memberships',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.telephone_internet',name:'Telephone & Internet',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.training',name:'Training & PPE',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.travel',name:'Travel & Accommodation',type:'expense',waterfallGroup:'Administrative Expenses',apportionMethod:'gp'},
+  {id:'expense.water',name:'Water & Sanitation',type:'expense',waterfallGroup:'Operating Expenses',apportionMethod:'consumption'},
+  {id:'other_expense.interest_paid',name:'Interest Paid',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
+  {id:'other_expense.depreciation',name:'Depreciation',type:'other_expense',waterfallGroup:'Operating Expenses',apportionMethod:'gp'},
+  {id:'other_expense.bad_debts',name:'Bad Debts',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
+  {id:'other_expense.forex',name:'Forex Gains/Losses',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
+  {id:'other_expense.fines',name:'Fines & Penalties',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
+  {id:'other_expense.income_tax',name:'Income Tax',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
+  {id:'other_expense.equipment_rental',name:'Equipment Rental',type:'other_expense',waterfallGroup:'Operating Expenses',apportionMethod:'gp'},
+  {id:'other_expense.interest_paid_connected_persons',name:'Interest paid (Connected persons)',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
+  {id:'other_expense.interest_on_installment_agreements',name:'Interest on Installment Agreements',type:'other_expense',waterfallGroup:'Other Expenses',apportionMethod:'gp'},
   // Balance Sheet
   {id:'asset_current.bank',name:'Bank Accounts',type:'asset_current',autoFlip:true},
   {id:'asset_current.trade_debtors',name:'Trade Debtors',type:'asset_current'},
@@ -449,8 +512,8 @@ const REPORTING_COA=[
 ];
 
 const COA_SECTIONS={
-  income:'Income',cogs:'Cost of Sales',other_income:'Other Income',
-  expense:'Operating Expenses',other_expense:'Other Expenses / Non-operating',
+  income:'Income Accounts',cogs:'Direct Cost Accounts',other_income:'Other Income Accounts',
+  expense:'Expense Accounts',other_expense:'Other Expense Accounts',
   asset_current:'Current Assets',asset_noncurrent:'Non-current Assets',
   liability_current:'Current Liabilities',liability_noncurrent:'Non-current Liabilities',
   equity:'Equity'
@@ -690,8 +753,36 @@ function ensureClientDefaults(){
     if(m.id==='asset_noncurrent.ppe'&&hasPPECOA)return; // don't re-add flat PPE if already expanded
     if(!client.reportingCOA.find(x=>x.id===m.id))client.reportingCOA.push(JSON.parse(JSON.stringify(m)));
   });
+  // Reporting (waterfall) groups — editable ordered list of P&L sections
+  if(!client.reportingGroups||!client.reportingGroups.length)client.reportingGroups=DEFAULT_REPORTING_GROUPS.slice();
+  // Apportionment % settings — one shared table per method, used by any COA line tagged with it
+  if(!client.apportionmentSettings)client.apportionmentSettings={};
+  ['area','consumption'].forEach(method=>{
+    if(!client.apportionmentSettings[method])client.apportionmentSettings[method]={pct:{},note:''};
+    if(!client.apportionmentSettings[method].pct)client.apportionmentSettings[method].pct={};
+    SHARED_APPORTION_DEPTS.forEach(id=>{if(client.apportionmentSettings[method].pct[id]===undefined)client.apportionmentSettings[method].pct[id]=0;});
+    if(client.apportionmentSettings[method].note===undefined)client.apportionmentSettings[method].note='';
+  });
+  // Migrate existing COA lines (from before this feature) to carry a waterfallGroup + apportionMethod.
+  // P&L types only — balance sheet / equity lines don't participate in the departmental waterfall.
+  // Prefer the master REPORTING_COA's per-account default (e.g. Rent -> area,
+  // Electricity/Water -> consumption) over the generic per-type fallback, since
+  // a client's saved file may already have this id without the two new fields.
+  const PL_TYPES=['income','cogs','other_income','expense','other_expense'];
+  const DEFAULT_GROUP_BY_TYPE={income:'Income',cogs:'Direct Cost of Sales',other_income:'Other Income',expense:'Operating Expenses',other_expense:'Other Expenses'};
+  client.reportingCOA.forEach(c=>{
+    if(!PL_TYPES.includes(c.type))return;
+    let master=REPORTING_COA.find(m=>m.id===c.id);
+    if(!c.waterfallGroup)c.waterfallGroup=(master&&master.waterfallGroup)||DEFAULT_GROUP_BY_TYPE[c.type]||client.reportingGroups[0];
+    if(!c.apportionMethod)c.apportionMethod=(master&&master.apportionMethod)||((c.type==='income'||c.type==='cogs')?'direct':'gp');
+  });
   if(!client.mappings)client.mappings={};
   if(!client.mappingConfirmed)client.mappingConfirmed={};
+  // Per-account overrides of the automatic Sage-name-based department/role
+  // tagging (SAGE_DEPT_MAP). Keyed by Sage account name; {dept,role} to
+  // reassign, or {dept:'',role:''} to explicitly exclude an otherwise-tagged
+  // account from every department. See effectiveDeptMap().
+  if(!client.deptOverrides)client.deptOverrides={};
   if(!client.raw)client.raw={};
   if(!client.raw.pl)client.raw.pl={periods:[],accounts:{}};
   if(!client.raw.bs)client.raw.bs={asOf:null,accounts:{}};
@@ -862,8 +953,33 @@ function renderSettings(){
     <div class="grid">
       <div><label>Reconciliation Tolerance</label><input type="number" id="kb_staff_tol" value="${client.kpiBenchmarks.staff_savings_tolerance||50}"> <span class="muted">R (default R 50)</span></div>
     </div>
+    <h3>Department Apportionment %</h3>
+    <p class="muted" style="font-size:12px;margin-bottom:8px">Used for any Reporting COA line set to the "Area" or "Consumption" apportionment method (e.g. Rent, Electricity, Water). Enter each department's % share and record how it was worked out — the note prints with the report.</p>
+    ${['area','consumption'].map(method=>{
+      let cfg=client.apportionmentSettings[method];
+      let label=method==='area'?'Area (e.g. Rent — % of floor space occupied)':'Consumption (e.g. Electricity, Water — % of metered/estimated usage)';
+      return `<div style="background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px">
+        <div style="font-weight:bold;font-size:13px;margin-bottom:8px">${label}</div>
+        <div class="grid">
+          ${SHARED_APPORTION_DEPTS.map(id=>{
+            let dept=DEPARTMENTS.find(d=>d.id===id);
+            return `<div><label>${esc(dept?dept.label:id)} %</label><input type="number" id="apport_${method}_${id}" value="${num(cfg.pct[id])||0}" step="0.1" min="0" max="100"></div>`;
+          }).join('')}
+        </div>
+        <div id="apport_${method}_total" class="muted" style="font-size:11px;margin:4px 0 8px"></div>
+        <label>Note — how this was calculated</label>
+        <textarea id="apport_${method}_note" rows="2" placeholder="e.g. Measured floor area per department, Sept 2026 site survey.">${esc(cfg.note||'')}</textarea>
+      </div>`;
+    }).join('')}
     <div class="btns"><button class="btn primary" onclick="saveSettings()">Apply Settings</button></div>
   </div>`;
+  ['area','consumption'].forEach(method=>{
+    let el=document.getElementById('apport_'+method+'_total');
+    if(el){
+      let total=SHARED_APPORTION_DEPTS.reduce((s,id)=>s+(num(document.getElementById('apport_'+method+'_'+id).value)||0),0);
+      el.textContent='Total: '+total.toFixed(1)+'%'+(Math.abs(total-100)>0.05?'  ⚠ should add up to 100%':'  ✓');
+    }
+  });
 }
 function saveSettings(){
   ensureClientDefaults();
@@ -891,6 +1007,15 @@ function saveSettings(){
   kb.provisional_tax_paid=parseFloat(document.getElementById('kb_prov_tax').value)||0;
   kb.corp_tax_rate=parseFloat(document.getElementById('kb_tax_rate').value)/100;
   kb.staff_savings_tolerance=parseFloat(document.getElementById('kb_staff_tol').value)||50;
+  ['area','consumption'].forEach(method=>{
+    let cfg=client.apportionmentSettings[method];
+    SHARED_APPORTION_DEPTS.forEach(id=>{
+      let el=document.getElementById('apport_'+method+'_'+id);
+      if(el)cfg.pct[id]=parseFloat(el.value)||0;
+    });
+    let noteEl=document.getElementById('apport_'+method+'_note');
+    if(noteEl)cfg.note=noteEl.value;
+  });
   mark();
   // Update the YTD label to reflect the new month
   let lbl=document.getElementById('ytdLabel');
@@ -1575,13 +1700,14 @@ async function importBudgetXL(){
     addBud('other_expense.interest_paid', rowIndex.interest4);
     addBud('other_expense.depreciation', rowIndex.depreciation);
 
-    // Dept sales budgets from individual dept sales rows (BM, IM, TR, TD, TDA, PMM)
+    // Dept sales budgets from individual dept sales rows (BM, IM, TR, TD incl. TDA
+    // Extrusion which is always combined into Tube Department, PMM)
     let DEPT_KEYWORDS={
       bm: ['blow moulding'], im: ['injection moulding'],
-      tr: ['toolroom'],      td: ['dispensing tubes','tube department'],
-      tda:['extrusion'],     pmm:['raw material','sales - pmm','other sales','sales - time','sales - buy out']
+      tr: ['toolroom'],      td: ['dispensing tubes','tube department','extrusion'],
+      pmm:['raw material','sales - pmm','other sales','sales - time','sales - buy out']
     };
-    let deptSalesRows={bm:[],im:[],tr:[],td:[],tda:[],pmm:[]};
+    let deptSalesRows={bm:[],im:[],tr:[],td:[],pmm:[]};
     rows.forEach((row,i)=>{
       if(i<8||i>30)return; // sales rows are in first section
       let n=getName(row).toLowerCase();
@@ -1670,6 +1796,18 @@ function renderMapping(){
   let plOpts=coaOptGroups('pl');
   let bsOpts=coaOptGroups('bs');
 
+  // Dept/Role <select> option lists for the editable department override.
+  function deptOptGroup(selectedDept){
+    let html='<option value=""'+(!selectedDept?' selected':'')+'>—</option>';
+    DEPARTMENTS.forEach(d=>{html+='<option value="'+d.id+'"'+(selectedDept===d.id?' selected':'')+'>'+esc(d.label)+'</option>';});
+    return html;
+  }
+  function roleOptGroup(selectedRole){
+    let html='<option value=""'+(!selectedRole?' selected':'')+'>—</option>';
+    DEPT_ROLES.forEach(([id,label])=>{html+='<option value="'+id+'"'+(selectedRole===id?' selected':'')+'>'+esc(label)+'</option>';});
+    return html;
+  }
+
   let filterVal=window._mappingFilter||'all';
   let searchVal=window._mappingSearch||'';
 
@@ -1683,8 +1821,14 @@ function renderMapping(){
   let rows=entries.map(([name,kind])=>{
     let mapped=client.mappings[name]||'';
     let confirmed=client.mappingConfirmed[name];
-    let deptInfo=SAGE_DEPT_MAP[name];
-    let deptBadge=deptInfo?'<span class="pill" style="background:#eef2ff;color:#3730a3;font-size:10px">'+(DEPARTMENTS.find(d=>d.id===deptInfo.dept)||{label:deptInfo.dept}).label+'</span>':'<span class="muted" style="font-size:10px">—</span>';
+    let override=client.deptOverrides[name];
+    let effDeptInfo=effectiveDeptMap()[name]||{dept:'',role:''};
+    let isOverridden=!!override;
+    let deptCell='<div style="display:flex;flex-direction:column;gap:2px">'+
+      '<select style="font-size:11px;padding:2px;width:100%" onchange="setDeptOverride(\''+esc(name)+'\',\'dept\',this.value)">'+deptOptGroup(effDeptInfo.dept)+'</select>'+
+      '<select style="font-size:11px;padding:2px;width:100%" onchange="setDeptOverride(\''+esc(name)+'\',\'role\',this.value)">'+roleOptGroup(effDeptInfo.role)+'</select>'+
+      (isOverridden?'<button class="btn sm" style="font-size:10px;padding:1px 4px" title="Clear override, go back to automatic" onclick="clearDeptOverride(\''+esc(name)+'\')">↺ Reset</button>':'')+
+    '</div>';
     let opts=(kind==='pl'?plOpts:bsOpts).replace(mapped?'value="'+mapped+'"':'__NOMATCH__',mapped?'value="'+mapped+'" selected':'');
     let statusBtn=mapped
       ?(confirmed
@@ -1693,9 +1837,9 @@ function renderMapping(){
       :'<span class="muted" style="font-size:11px">Unmapped</span>';
     // data-name attribute used for live CSS search filtering
     return '<tr data-name="'+esc(name.toLowerCase())+'">'+
-      '<td style="font-size:12px">'+esc(name)+'</td>'+
+      '<td style="font-size:12px">'+esc(name)+(isOverridden?' <span class="muted" title="Department/role manually overridden" style="font-size:10px">✎</span>':'')+'</td>'+
       '<td style="font-size:11px;white-space:nowrap"><span class="muted">'+kind.toUpperCase()+'</span></td>'+
-      '<td style="font-size:11px">'+deptBadge+'</td>'+
+      '<td style="font-size:11px">'+deptCell+'</td>'+
       '<td><select style="font-size:12px;padding:4px;width:100%;min-width:200px" onchange="setMapping(\''+esc(name)+'\',\''+kind+'\',this.value)">'+opts+'</select></td>'+
       '<td>'+statusBtn+'</td>'+
     '</tr>';
@@ -1713,13 +1857,13 @@ function renderMapping(){
       '</div>'+
       '<input id="mappingSearch" placeholder="🔍 Search account name…" style="flex:1;min-width:180px;padding:6px 10px;font-size:12px" value="'+esc(searchVal)+'" oninput="mappingSearchFilter(this.value)">'+
     '</div>'+
-    '<p class="muted" style="margin-bottom:10px;font-size:12px">💡 Department assignments are automatic from Sage account names. Only the <b>Reporting COA</b> column needs your attention. New accounts from an import that don\'t match any COA line appear as \"Unmapped\" — either map them or leave unmapped to exclude from reports. To add a new COA line, go to <b>Reporting COA</b>.</p>'+
+    '<p class="muted" style="margin-bottom:10px;font-size:12px">💡 Department assignments come automatically from Sage account names, but can be corrected per account with the <b>Dept / Role</b> dropdowns (✎ marks a manual override; ↺ Reset returns it to automatic). New accounts from an import that don\'t match any COA line appear as \"Unmapped\" — either map them or leave unmapped to exclude from reports. To add a new COA line, go to <b>Reporting COA</b>.</p>'+
     '<div style="overflow:auto;max-height:calc(100vh - 360px);border:1px solid var(--line);border-radius:10px">'+
     '<table id="mappingTable">'+
       '<thead><tr>'+
         '<th style="min-width:220px">Sage Account Name</th>'+
         '<th style="width:50px">Source</th>'+
-        '<th style="width:120px">Dept (Auto)</th>'+
+        '<th style="width:150px">Dept / Role</th>'+
         '<th style="min-width:220px">→ Reporting COA Line</th>'+
         '<th style="width:100px">Status</th>'+
       '</tr></thead>'+
@@ -1764,27 +1908,60 @@ function confirmAllMapped(){
 // ═══════════════════════════════════════════════════════
 //  COA VIEW
 // ═══════════════════════════════════════════════════════
+const APPORTION_METHODS=[{id:'direct',label:'Direct'},{id:'gp',label:'GP'},{id:'area',label:'Area'},{id:'consumption',label:'Consumption'}];
+const PL_TYPES_FOR_COA=['income','cogs','other_income','expense','other_expense'];
+
 function renderCOA(){
   ensureClientDefaults();
   let html=`<div class="panel">
     <h2>Reporting Chart of Accounts</h2>
     <p class="muted" style="margin-bottom:10px">Add, rename, hide or delete COA lines. Hidden lines still hold mappings but are excluded from reports. A line with Sage accounts mapped cannot be deleted — remap those accounts first.</p>
+
+    <div style="background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px">
+      <h4 style="margin-bottom:8px">Reporting Groups (P&amp;L Waterfall)</h4>
+      <p class="muted" style="margin-bottom:10px">The order and names of the sections in the Management P&amp;L. Every Direct Cost of Sales / Operating Expenses / Administrative Expenses / Other Income / Other Expenses line below is linked to one of these.</p>
+      <div id="reportingGroupsList">
+        ${client.reportingGroups.map((g,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+          <span class="muted" style="width:20px;font-size:11px;text-align:center">${i+1}</span>
+          <input style="flex:1" value="${esc(g)}" onchange="renameReportingGroup(${i},this.value)">
+          <button class="btn sm" onclick="moveReportingGroup(${i},-1)" title="Move up" style="padding:3px 7px">↑</button>
+          <button class="btn sm" onclick="moveReportingGroup(${i},1)" title="Move down" style="padding:3px 7px">↓</button>
+          <button class="btn sm danger" onclick="deleteReportingGroup(${i})" title="Remove" style="padding:3px 7px">✕</button>
+        </div>`).join('')}
+      </div>
+      <button class="btn sm" onclick="addReportingGroup()">➕ Add Group</button>
+    </div>
+
     <div class="btns" style="margin-bottom:12px">
       <button class="btn primary" onclick="showAddCOALine()">➕ Add Reporting Line</button>
       <button class="btn" onclick="resetCOAToDefault()">↩ Reset to Default COA</button>
     </div>`;
 
+  // dcosGroupName: which Reporting Group is "Direct Cost of Sales" right
+  // now (it can be renamed) — used below to flag a 'cogs' line that's been
+  // moved to a different Reporting Group. This section (grouped by each
+  // line's Sage account TYPE, e.g. "Direct Cost Accounts") is a different
+  // axis from Reporting Group (which P&L waterfall section it actually
+  // lands in) — a 'cogs' line can be reassigned out of Direct Cost of
+  // Sales and still sit in this section, because "Direct Cost Accounts"
+  // here just means "sourced from Sage as a cost-of-sales account", not
+  // "counted in Gross Profit".
+  let dcosGroupNameForCOA=plGroupStructure().dcosGroupName;
+
   COA_SECTION_ORDER.forEach(sec=>{
     let lines=client.reportingCOA.filter(c=>c.type===sec);
     if(!lines.length)return;
+    let isPL=PL_TYPES_FOR_COA.includes(sec);
     html+=`<div style="margin-bottom:16px">
       <div style="background:var(--brand);color:#fff;padding:6px 10px;border-radius:6px 6px 0 0;font-weight:bold;font-size:12px">${COA_SECTIONS[sec]||sec}</div>
+      ${sec==='cogs'?'<p class="muted" style="font-size:11px;margin:4px 0 0;padding:0 2px">This section lists every line Sage tags as a cost-of-sales account. A line\'s own <b>Reporting Group</b> below is what actually decides where it lands on the P&amp;L — reassign it away from "'+esc(dcosGroupNameForCOA)+'" (e.g. to Operating Expenses) and it moves below Gross Profit on the Statement and Dept P&amp;L even though it stays listed here.</p>':''}
       <div style="border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;overflow:hidden">
       <table style="margin:0">
         <thead><tr>
           <th style="width:32px">#</th>
-          <th style="min-width:220px">Reporting Line Name</th>
-          <th style="width:180px">COA ID</th>
+          <th style="min-width:200px">Reporting Line Name</th>
+          <th style="width:160px">COA ID</th>
+          ${isPL?'<th style="width:170px">Reporting Group</th><th style="width:130px">Apportionment</th>':''}
           <th>Sage Accounts Mapped</th>
           <th style="width:120px">Actions</th>
         </tr></thead>
@@ -1797,12 +1974,18 @@ function renderCOA(){
       html+=`<tr style="${rowStyle}">
         <td class="muted" style="font-size:11px;text-align:center">${i+1}</td>
         <td>
-          <input style="border:0;background:transparent;width:100%;font-weight:bold;font-size:13px" 
-            value="${esc(c.name)}" 
+          <input style="border:0;background:transparent;width:100%;font-weight:bold;font-size:13px"
+            value="${esc(c.name)}"
             onchange="renameCOALine(${idx},this.value)"
             title="Click to rename">
         </td>
         <td class="muted" style="font-size:10px">${esc(c.id)}</td>
+        ${isPL?`<td><select style="font-size:11px;width:100%" onchange="setCOALineGroup(${idx},this.value)">
+            ${client.reportingGroups.map(g=>`<option value="${esc(g)}"${c.waterfallGroup===g?' selected':''}>${esc(g)}</option>`).join('')}
+          </select>${(sec==='cogs'&&c.waterfallGroup!==dcosGroupNameForCOA)?`<div style="font-size:10px;color:#b45309;margin-top:2px">⚠ Moved out of ${esc(dcosGroupNameForCOA)} — shows below Gross Profit</div>`:''}</td>
+          <td><select style="font-size:11px;width:100%" onchange="setCOALineMethod(${idx},this.value)">
+            ${APPORTION_METHODS.map(m=>`<option value="${m.id}"${c.apportionMethod===m.id?' selected':''}>${m.label}</option>`).join('')}
+          </select></td>`:''}
         <td style="font-size:11px">${mapped.slice(0,4).map(m=>`<span class="pill" style="background:#f0f4ff;color:#374151;margin:1px;display:inline-block">${esc(m)}</span>`).join('')}${mapped.length>4?`<span class="muted"> +${mapped.length-4} more</span>`:''} ${mapped.length===0?'<span class="muted">— unmapped</span>':''}</td>
         <td style="white-space:nowrap">
           <button class="btn sm" onclick="moveCOALine(${idx},-1)" title="Move up" style="padding:3px 7px">↑</button>
@@ -1854,7 +2037,13 @@ function addCOALine(){
   if(client.reportingCOA.find(c=>c.id===id)){
     id=id+'_'+Date.now().toString(36);
   }
-  client.reportingCOA.push({id,name,type});
+  const DEFAULT_GROUP_BY_TYPE_NEW={income:'Income',cogs:'Direct Cost of Sales',other_income:'Other Income',expense:'Operating Expenses',other_expense:'Other Expenses'};
+  let newLine={id,name,type};
+  if(PL_TYPES_FOR_COA.includes(type)){
+    newLine.waterfallGroup=DEFAULT_GROUP_BY_TYPE_NEW[type]||client.reportingGroups[0];
+    newLine.apportionMethod=(type==='income'||type==='cogs')?'direct':'gp';
+  }
+  client.reportingCOA.push(newLine);
   document.getElementById('newCOAName').value='';
   document.getElementById('newCOAIdSuffix').value='';
   renderCOA();
@@ -1897,6 +2086,47 @@ function moveCOALine(idx,dir){
 function resetCOAToDefault(){
   if(!confirm('Reset COA to the built-in default? This will remove any custom lines you added, but will not change your account mappings.'))return;
   client.reportingCOA=JSON.parse(JSON.stringify(REPORTING_COA));
+  renderCOA();
+}
+
+function setCOALineGroup(idx,val){
+  client.reportingCOA[idx].waterfallGroup=val;
+}
+
+function setCOALineMethod(idx,val){
+  client.reportingCOA[idx].apportionMethod=val;
+}
+
+function renameReportingGroup(idx,newName){
+  newName=newName.trim();
+  if(!newName)return;
+  let old=client.reportingGroups[idx];
+  if(old===newName)return;
+  client.reportingGroups[idx]=newName;
+  // Keep every COA line pointing at the renamed group
+  client.reportingCOA.forEach(c=>{if(c.waterfallGroup===old)c.waterfallGroup=newName;});
+  renderCOA();
+}
+
+function moveReportingGroup(idx,dir){
+  let arr=client.reportingGroups;
+  let targetIdx=idx+dir;
+  if(targetIdx<0||targetIdx>=arr.length)return;
+  [arr[idx],arr[targetIdx]]=[arr[targetIdx],arr[idx]];
+  renderCOA();
+}
+
+function deleteReportingGroup(idx){
+  let name=client.reportingGroups[idx];
+  let used=client.reportingCOA.filter(c=>c.waterfallGroup===name);
+  if(used.length>0){alert('Cannot remove: '+used.length+' COA line(s) are linked to "'+name+'". Move them to another group first.');return;}
+  if(!confirm('Remove group "'+name+'"?'))return;
+  client.reportingGroups.splice(idx,1);
+  renderCOA();
+}
+
+function addReportingGroup(){
+  client.reportingGroups.push('New Group');
   renderCOA();
 }
 
@@ -1945,7 +2175,7 @@ function getActualYTD(coaId,months,rawData){
 function getDeptValue(deptId,role,period,rawData){
   rawData=rawData||client.raw.pl;
   let total=0;
-  Object.entries(SAGE_DEPT_MAP).forEach(([acctName,info])=>{
+  Object.entries(effectiveDeptMap()).forEach(([acctName,info])=>{
     if(info.dept===deptId&&info.role===role){
       let v=rawData.accounts[acctName]?rawData.accounts[acctName][period]:0;
       total+=num(v);
@@ -1975,27 +2205,225 @@ function computeDeptGP(deptId,period,rawData){
   return {sales,openingStock,purchases,closingStock,wages,consumables,r_and_m,cosDirect,cos,gp:sales-cos};
 }
 
-// Departments that share PMM's pooled costs, and get a slice of PMM (Shared)'s
-// COS apportioned to them in proportion to their turnover for the period.
+// Departments that participate in cost apportionment (the four operating depts).
 const SHARED_APPORTION_DEPTS=['im','bm','tr','td'];
 
+// "Core" GP per department — Sales less only the costs Sage already splits by
+// department (opening/closing stock, purchases, wages, consumables, R&M,
+// direct COS) — i.e. computeDeptGP()'s own gp value, before any apportionment
+// is layered on. Used as the ratio base for the 'gp' apportionment method so
+// it never depends on a number that itself depends on apportionment.
+function computeCoreGPRatios(period){
+  let coreGP={},total=0;
+  SHARED_APPORTION_DEPTS.forEach(id=>{
+    let g=computeDeptGP(id,period).gp;
+    coreGP[id]=g;total+=g;
+  });
+  let ratios={};
+  SHARED_APPORTION_DEPTS.forEach(id=>{ratios[id]=total?coreGP[id]/total:0;});
+  return {coreGP,total,ratios};
+}
+
+// Split every PMM (Shared)-tagged Sage account for a period by where its own
+// Reporting COA mapping actually places it: still Direct Cost of Sales (or
+// unmapped) stays part of the pre-GP "Shared / Apportioned (PMM)" pool below;
+// anything Johan has remapped to a post-GP Reporting Group (e.g. moved
+// "Wages - PMM" onto a line tagged Operating Expenses) is pulled out here so
+// it can be apportioned into THAT group instead — otherwise a PMM account's
+// own Reporting Group reassignment would show correctly on the company
+// Statement but never move on the Dept P&L view.
+function pmmAccountSplit(period,rawData){
+  rawData=rawData||client.raw.pl;
+  let st=plGroupStructure();
+  let dcosTotal=0,dcosAccounts=[];
+  let byGroup={};
+  Object.entries(effectiveDeptMap()).forEach(([acctName,info])=>{
+    if(info.dept!=='pmm')return;
+    let v=num(rawData.accounts[acctName]?rawData.accounts[acctName][period]:0);
+    if(!v)return;
+    let coaId=client.mappings[acctName];
+    let coa=coaId?(client.reportingCOA||[]).find(c=>c.id===coaId):null;
+    let group=coa?coa.waterfallGroup:null;
+    if(!group||group===st.dcosGroupName){
+      dcosTotal+=v;
+      dcosAccounts.push({name:acctName,value:v});
+    }else if(coa.type==='cogs'){
+      // Reclassified onto a post-GP group but still 'cogs'-typed (e.g. the
+      // Repairs & Maintenance precedent) — apportionGroupNet() deliberately
+      // excludes 'cogs' lines from post-GP apportionment (see its comment),
+      // so this account would otherwise be picked up nowhere. This is the
+      // only place that apportions it.
+      if(!byGroup[group])byGroup[group]=[];
+      byGroup[group].push({name:acctName,value:v,method:coa.apportionMethod||'gp'});
+    }
+    // else: coa.type is 'expense'/'other_expense'/'other_income' — that line
+    // is already summed company-wide and apportioned by apportionGroupNet(),
+    // so it's deliberately left out of both buckets here to avoid counting
+    // it twice.
+  });
+  return {dcosTotal,dcosAccounts,byGroup};
+}
+
 // Apportion PMM (Shared) COS across IM / BM / TR / TD in the ratio each
-// department contributed to that month's turnover.
+// department contributed to that month's own GP — per the 30 Sep client
+// meeting decision (previously turnover ratio). Only the portion of PMM's
+// costs still classified as Direct Cost of Sales — see pmmAccountSplit();
+// anything reclassified to a post-GP group is apportioned separately by
+// computePmmGroupApportionment() instead.
 function computeSharedApportionment(period){
-  let turnovers={};
-  let totalTurnover=0;
-  SHARED_APPORTION_DEPTS.forEach(id=>{
-    let t=computeDeptGP(id,period).sales;
-    turnovers[id]=t;
-    totalTurnover+=t;
-  });
-  let sharedCos=computeDeptGP('pmm',period).cos;
+  let gpr=computeCoreGPRatios(period);
+  let split=pmmAccountSplit(period);
+  let sharedCos=split.dcosTotal;
   let apportioned={};
-  SHARED_APPORTION_DEPTS.forEach(id=>{
-    let ratio=totalTurnover?turnovers[id]/totalTurnover:0;
-    apportioned[id]=sharedCos*ratio;
+  SHARED_APPORTION_DEPTS.forEach(id=>{apportioned[id]=sharedCos*gpr.ratios[id];});
+  let byAccount=split.dcosAccounts.map(a=>{
+    let acctApportioned={};
+    SHARED_APPORTION_DEPTS.forEach(id=>{acctApportioned[id]=a.value*gpr.ratios[id];});
+    return {name:a.name,total:a.value,method:'gp',apportioned:acctApportioned};
   });
-  return {turnovers,totalTurnover,sharedCos,apportioned};
+  return {ratios:gpr.ratios,coreGP:gpr.coreGP,sharedCos,apportioned,byAccount};
+}
+
+// PMM (Shared) accounts that Johan has reclassified onto a post-GP Reporting
+// Group (see pmmAccountSplit) — apportioned into that group across IM / BM /
+// TR / TD, each account by its own Apportionment Method, and merged with
+// apportionGroupNet()'s normal company-wide COA-line apportionment for that
+// same group so the two sources land in one combined total per department.
+function computePmmGroupApportionment(groupName,period){
+  let split=pmmAccountSplit(period);
+  let accounts=split.byGroup[groupName]||[];
+  let net={im:0,bm:0,tr:0,td:0};
+  let byAccount=[];
+  accounts.forEach(a=>{
+    let ratios=a.method==='area'?apportionRatiosFromSettings('area')
+      :a.method==='consumption'?apportionRatiosFromSettings('consumption')
+      :computeCoreGPRatios(period).ratios;
+    let apportioned={};
+    SHARED_APPORTION_DEPTS.forEach(id=>{apportioned[id]=a.value*(ratios[id]||0);net[id]+=apportioned[id];});
+    byAccount.push({name:a.name,total:a.value,method:a.method,apportioned});
+  });
+  return {net,byAccount};
+}
+
+// Read a department's % for a settings-driven apportionment method (area /
+// consumption) as a decimal (25 -> 0.25). Configured in Settings.
+function apportionRatiosFromSettings(method){
+  let pct=(client.apportionmentSettings&&client.apportionmentSettings[method]&&client.apportionmentSettings[method].pct)||{};
+  let ratios={};
+  SHARED_APPORTION_DEPTS.forEach(id=>{ratios[id]=(num(pct[id])||0)/100;});
+  return ratios;
+}
+
+// Split one Reporting COA account's company-wide total for a period across
+// IM / BM / TR / TD, using that account's own Apportionment Method (set in
+// the COA editor): gp / area / consumption. Operating/Administrative/Other
+// accounts have no per-department figure in Sage at all (unlike Direct Cost
+// of Sales, which Sage already splits per department — see computeDeptGP),
+// so 'direct' falls back to the GP ratio for these rather than silently
+// dropping the amount.
+function apportionAccount(coaId,period){
+  let coa=(client.reportingCOA||[]).find(c=>c.id===coaId);
+  let method=coa?coa.apportionMethod:'gp';
+  let total=getCoaValue(coaId,period);
+  let ratios;
+  if(method==='area')ratios=apportionRatiosFromSettings('area');
+  else if(method==='consumption')ratios=apportionRatiosFromSettings('consumption');
+  else ratios=computeCoreGPRatios(period).ratios; // 'gp', or 'direct' fallback
+  let apportioned={};
+  SHARED_APPORTION_DEPTS.forEach(id=>{apportioned[id]=total*(ratios[id]||0);});
+  return {method,total,apportioned};
+}
+
+// Net apportioned amount for every expense/other_expense/other_income line in
+// one waterfall group, sign-adjusted (income reduces the net cost total).
+function apportionGroupNet(groupName,period){
+  let lines=(client.reportingCOA||[]).filter(c=>c.waterfallGroup===groupName&&['expense','other_expense','other_income'].includes(c.type));
+  let net={im:0,bm:0,tr:0,td:0};
+  let byAccount=[];
+  lines.forEach(c=>{
+    let act=getCoaValue(c.id,period);
+    if(!act)return;
+    let res=apportionAccount(c.id,period);
+    let sign=c.type==='other_income'?-1:1;
+    SHARED_APPORTION_DEPTS.forEach(id=>{net[id]+=res.apportioned[id]*sign;});
+    byAccount.push({id:c.id,name:c.name,type:c.type,total:act,method:res.method,apportioned:res.apportioned});
+  });
+  return {net,byAccount};
+}
+
+// ═══════════════════════════════════════════════════════
+//  COMPANY P&L WATERFALL — single source of truth
+//
+// Every P&L report (Statement, Dashboard, Trend, Dept Cards' opex/admin
+// split) must place each account where its OWN "Reporting Group" dropdown
+// (waterfallGroup) says, not by its legacy Sage type (income/cogs/
+// other_income/expense/other_expense — a technical bucket that only
+// decides the account's ID prefix and its home in the Budget Builder and
+// COA editor's account lists). The two are independent: e.g. Repairs &
+// Maintenance is type 'cogs' (for ID/budget purposes) but Johan tags it
+// waterfallGroup 'Operating Expenses', so it must reduce Operating Profit,
+// not Gross Profit.
+//
+// plGroupStructure() resolves, from client.reportingGroups, which group is
+// Income and which is Direct Cost of Sales (these two build Gross Profit;
+// matched by name, falling back to list position 0/1 if renamed away from
+// the default), and the ordered list of every other group that has at
+// least one account assigned to it.
+function plGroupStructure(){
+  ensureClientDefaults();
+  let allGroups=(client.reportingGroups&&client.reportingGroups.length)?client.reportingGroups:DEFAULT_REPORTING_GROUPS;
+  const PL_TYPES=['income','cogs','other_income','expense','other_expense'];
+  function linesForGroup(g){return client.reportingCOA.filter(c=>!c.hidden&&PL_TYPES.includes(c.type)&&c.waterfallGroup===g);}
+  let incomeGroupName=allGroups.includes('Income')?'Income':(allGroups[0]||'Income');
+  let dcosGroupName=allGroups.includes('Direct Cost of Sales')?'Direct Cost of Sales':(allGroups[1]||'Direct Cost of Sales');
+  let postGroups=allGroups.filter(g=>g!==incomeGroupName&&g!==dcosGroupName)
+    .map(g=>({name:g,lines:linesForGroup(g)}))
+    .filter(g=>g.lines.length>0);
+  return {incomeGroupName,dcosGroupName,incomeLines:linesForGroup(incomeGroupName),dcosLines:linesForGroup(dcosGroupName),postGroups};
+}
+const PL_COST_TYPES=['cogs','expense','other_expense'];
+const PL_INC_TYPES=['income','other_income'];
+
+// Which post-GP group is "Operating Expenses" (if any), and every other
+// post-GP group. Drives the Dept Cards' Operating Profit split — resolved
+// dynamically from client.reportingGroups rather than a hardcoded name list.
+function deptGroupSplit(){
+  let st=plGroupStructure();
+  let names=st.postGroups.map(g=>g.name);
+  let opexName=names.find(n=>n.trim().toLowerCase()==='operating expenses')||null;
+  let belowNames=names.filter(n=>n!==opexName);
+  return {opexName,belowNames};
+}
+
+// Sum valFn(id) — e.g. an actual, budget, PY or YTD lookup — over a list of
+// Reporting COA lines.
+function sumCoaLines(lines,valFn){return lines.reduce((s,c)=>s+valFn(c.id),0);}
+
+// Build the full company waterfall (Income → Direct Cost of Sales → Gross
+// Profit → every other reporting group in order → Net Profit) for one
+// figure basis at a time. valFn(id) supplies that basis's number for one
+// COA id — pass getAct/getActYTD/getBud/getBudYTD/getPY/getPYYTD (or an
+// equivalent) so this same engine drives actuals, budget, PY and YTD
+// columns identically.
+function computeCompanyWaterfall(valFn){
+  let st=plGroupStructure();
+  let inc=sumCoaLines(st.incomeLines,valFn);
+  let cos=sumCoaLines(st.dcosLines,valFn);
+  let gp=inc-cos;
+  let profit=gp,opProfit=null;
+  let groups=st.postGroups.map(g=>{
+    let costLines=g.lines.filter(c=>PL_COST_TYPES.includes(c.type));
+    let incLines=g.lines.filter(c=>PL_INC_TYPES.includes(c.type));
+    let isCostGroup=costLines.length>0;
+    let costTotal=sumCoaLines(costLines,valFn),incTotal=sumCoaLines(incLines,valFn);
+    let netCost=costTotal-incTotal; // >0 net cost (reduces profit), <0 net income (adds to profit)
+    let displayTotal=isCostGroup?netCost:-netCost;
+    profit-=netCost;
+    let out={name:g.name,lines:g.lines,costLines,incLines,isCostGroup,displayTotal,netCost,profitAfter:profit};
+    if(g.name.trim().toLowerCase()==='operating expenses')opProfit=profit;
+    return out;
+  });
+  return {incomeGroupName:st.incomeGroupName,dcosGroupName:st.dcosGroupName,incomeLines:st.incomeLines,dcosLines:st.dcosLines,inc,cos,gp,groups,np:profit,opProfit};
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2807,58 +3235,39 @@ function renderReport(){
   function getPY(id){return getCoaValue(id,rm,pl_py);}
   function getPYYTD(id){return getActualYTD(id,ytd,pl_py);}
 
-  // Key P&L lines
-  let incCm=getAct('income.sales')+getAct('income.other');
-  let incYtd=getActYTD('income.sales')+getActYTD('income.other');
-  let incBudCm=getBud('income.sales')+getBud('income.other');
-  let incBudYtd=getBudYTD('income.sales')+getBudYTD('income.other');
-  let incPyCm=getPY('income.sales')+getPY('income.other');
-  let incPyYtd=getPYYTD('income.sales')+getPYYTD('income.other');
+  // NOTE: PPE depreciation (Fixed Asset Register "dep" lines, ppe_dep.*)
+  // needs no separate patch here — those are ordinary Reporting COA lines
+  // (type 'other_expense') with their own Reporting Group, same as any
+  // other expense account, so computeCompanyWaterfall() below already
+  // picks them up by iterating every group's lines. (Pre-rebuild, the old
+  // hardcoded oeIds list didn't know about them, hence the old manual
+  // patch — adding it again here would double-count them.)
 
-  // NOTE: Closing stock is stored as a NEGATIVE value in Sage (it reduces COS).
-  // We simply ADD it — do NOT subtract — the negative sign handles the direction.
-  let cosCm=getAct('cogs.opening_stock')+getAct('cogs.purchases')+getAct('cogs.closing_stock')+getAct('cogs.wages')+getAct('cogs.consumables')+getAct('cogs.r_and_m')+getAct('cogs.cos_direct');
-  let cosYtd=getActYTD('cogs.opening_stock')+getActYTD('cogs.purchases')+getActYTD('cogs.closing_stock')+getActYTD('cogs.wages')+getActYTD('cogs.consumables')+getActYTD('cogs.r_and_m')+getActYTD('cogs.cos_direct');
+  // Company-wide P&L waterfall, for every figure basis, built once by
+  // computeCompanyWaterfall() from each account's own Reporting Group
+  // (waterfallGroup) — see that function's comment. Keeps this Statement
+  // in sync with the Dashboard, Trend and Dept Cards, which all now read
+  // the same engine.
+  let wCm=computeCompanyWaterfall(getAct);
+  let wYtd=computeCompanyWaterfall(getActYTD);
+  let wBudCm=computeCompanyWaterfall(getBud);
+  let wBudYtd=computeCompanyWaterfall(getBudYTD);
+  let wPyCm=computeCompanyWaterfall(getPY);
+  let wPyYtd=computeCompanyWaterfall(getPYYTD);
 
-  let gpCm=incCm-cosCm;
-  let gpYtd=incYtd-cosYtd;
+  let incCm=wCm.inc,incYtd=wYtd.inc,incBudCm=wBudCm.inc,incBudYtd=wBudYtd.inc,incPyCm=wPyCm.inc,incPyYtd=wPyYtd.inc;
+  let cosCm=wCm.cos,cosYtd=wYtd.cos,cosBudCm=wBudCm.cos,cosBudYtd=wBudYtd.cos,cosPyCm=wPyCm.cos,cosPyYtd=wPyYtd.cos;
+  let gpCm=wCm.gp,gpYtd=wYtd.gp,gpBudCm=wBudCm.gp,gpBudYtd=wBudYtd.gp,gpPyCm=wPyCm.gp,gpPyYtd=wPyYtd.gp;
   let gpPctCm=incCm?gpCm/incCm:0;
   let gpPctYtd=incYtd?gpYtd/incYtd:0;
-
-  let gpBudCm=incBudCm-(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((s,r)=>s+getBud('cogs.'+r),0));
-  let gpBudYtd=incBudYtd-(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((s,r)=>s+getBudYTD('cogs.'+r),0));
-  // NP budget = GP budget + other income budget - opex budget - other expense budget
-  let expBudCm=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'].reduce((s,id)=>s+getBud('expense.'+id),0);
-  let expBudYtd=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'].reduce((s,id)=>s+getBudYTD('expense.'+id),0);
-  let oiBudCm=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getBud('other_income.'+id),0);
-  let oiBudYtd=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getBudYTD('other_income.'+id),0);
-  let oeBudCm=['interest_paid','depreciation','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getBud('other_expense.'+id),0);
-  let oeBudYtd=['interest_paid','depreciation','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getBudYTD('other_expense.'+id),0);
-  let npBudCm=gpBudCm+oiBudCm-expBudCm-oeBudCm;
-  let npBudYtd=gpBudYtd+oiBudYtd-expBudYtd-oeBudYtd;
   let gpVarCm=gpBudCm?((gpCm-gpBudCm)/Math.abs(gpBudCm)):0;
   let gpVarYtd=gpBudYtd?((gpYtd-gpBudYtd)/Math.abs(gpBudYtd)):0;
 
-  let expIds=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'];
-  let expCm=expIds.reduce((s,id)=>s+getAct('expense.'+id),0);
-  let expYtd=expIds.reduce((s,id)=>s+getActYTD('expense.'+id),0);
-
-  let oeIds=['interest_paid','depreciation','bad_debts','forex','fines','income_tax'];
-  let oiIds=['interest_received','discounts_received','etd_deduction','recoveries'];
-  let oiCm=oiIds.reduce((s,id)=>s+getAct('other_income.'+id),0);
-  let oiYtd=oiIds.reduce((s,id)=>s+getActYTD('other_income.'+id),0);
-  let oeCm=oeIds.reduce((s,id)=>s+getAct('other_expense.'+id),0);
-  let oeYtd=oeIds.reduce((s,id)=>s+getActYTD('other_expense.'+id),0);
-  // PPE depreciation accounts (mapped to ppe_dep.*) must also hit NP
-  let ppeDepCm=Object.entries(client.mappings).filter(([,v])=>v&&v.startsWith('ppe_dep.')).reduce((s,[k])=>s+getCoaValue(v='ignore',v=k,v=client.raw.pl)||0,0);
-  // Simpler: sum all ppe_dep.* via getCoaValue for each unique ppe_dep id
-  let ppeDepIdsCm=[...new Set(Object.values(client.mappings).filter(v=>v&&v.startsWith('ppe_dep.')))].reduce((s,id)=>s+getCoaValue(id,rm),0);
-  let ppeDepIdsYtd=[...new Set(Object.values(client.mappings).filter(v=>v&&v.startsWith('ppe_dep.')))].reduce((s,id)=>s+getActualYTD(id,ytd),0);
-  oeCm+=ppeDepIdsCm;
-  oeYtd+=ppeDepIdsYtd;
-
-  let npCm=gpCm+oiCm-expCm-oeCm;
-  let npYtd=gpYtd+oiYtd-expYtd-oeYtd;
+  // Net Profit = Gross Profit, plus/minus every reporting group after
+  // Direct Cost of Sales, in order (computeCompanyWaterfall's .np).
+  let npCm=wCm.np, npYtd=wYtd.np;
+  let npBudCm=wBudCm.np, npBudYtd=wBudYtd.np;
+  let npPyCm=wPyCm.np, npPyYtd=wPyYtd.np;
   let npPctCm=incCm?npCm/incCm:0;
   let npPctYtd=incYtd?npYtd/incYtd:0;
   let incVarCm=incBudCm?((incCm-incBudCm)/Math.abs(incBudCm)):0;
@@ -2924,60 +3333,64 @@ function renderReport(){
   }
 
   let plRows='';
-  plRows+=`<tr class="section-row"><td colspan="10">Income</td></tr>`;
-  plRows+=stmtRow('Sales & Revenue',incCm,incBudCm||null,incPyCm||null,incYtd,incBudYtd||null,incPyYtd||null,'','',true);
 
-  plRows+=`<tr class="section-row"><td colspan="10">Cost of Sales</td></tr>`;
-  let cosLineIds=['opening_stock','purchases','wages','consumables','r_and_m','cos_direct','closing_stock'];
-  cosLineIds.forEach(id=>{
-    let act=getAct('cogs.'+id),bud=getBud('cogs.'+id),py=getPY('cogs.'+id);
-    let actY=getActYTD('cogs.'+id),budY=getBudYTD('cogs.'+id);
-    let py2=getPYYTD('cogs.'+id);
-    let label=client.reportingCOA.find(c=>c.id==='cogs.'+id)?.name||id;
-    if(act!==0||bud!==0||py!==0)plRows+=stmtRow(label,act,bud,py,actY,budY,py2,'',true,false);
+  // Income and Direct Cost of Sales — the two anchor groups that build
+  // Gross Profit. Every account renders under whichever of these two
+  // groups its own Reporting Group dropdown says (plGroupStructure),
+  // itemised the same way every other section below is.
+  plRows+=`<tr class="section-row"><td colspan="10">${esc(wCm.incomeGroupName)}</td></tr>`;
+  wCm.incomeLines.forEach(c=>{
+    let act=getAct(c.id),bud=getBud(c.id),py=getPY(c.id);
+    let actY=getActYTD(c.id),budY=getBudYTD(c.id),py2=getPYYTD(c.id);
+    if(act!==0||bud!==0||py!==0)plRows+=stmtRow(esc(c.name),act,bud,py,actY,budY,py2,'',true,true,c.id);
   });
-  // Total COS line
-  let cosPyCm=cosLineIds.reduce((s,id)=>s+getPY('cogs.'+id),0);
-  let cosPyYtd=cosLineIds.reduce((s,id)=>s+getPYYTD('cogs.'+id),0);
-  plRows+=stmtRow('Total Cost of Sales',cosCm,gpBudCm?incBudCm-gpBudCm:null,cosPyCm,cosYtd,gpBudYtd?incBudYtd-gpBudYtd:null,cosPyYtd,'subtotal-row',false,false);
-  // Gross Profit
-  let gpPyCm=incPyCm-cosPyCm;
-  let gpPyYtd=getPYYTD('income.sales')+getPYYTD('income.other')-cosPyYtd;
+  plRows+=stmtRow('Total '+wCm.incomeGroupName,incCm,incBudCm||null,incPyCm||null,incYtd,incBudYtd||null,incPyYtd||null,'subtotal-row',false,true);
+
+  plRows+=`<tr class="section-row"><td colspan="10">${esc(wCm.dcosGroupName)}</td></tr>`;
+  wCm.dcosLines.forEach(c=>{
+    let act=getAct(c.id),bud=getBud(c.id),py=getPY(c.id);
+    let actY=getActYTD(c.id),budY=getBudYTD(c.id),py2=getPYYTD(c.id);
+    if(act!==0||bud!==0||py!==0)plRows+=stmtRow(esc(c.name),act,bud,py,actY,budY,py2,'',true,false,c.id);
+  });
+  plRows+=stmtRow('Total '+wCm.dcosGroupName,cosCm,cosBudCm||null,cosPyCm,cosYtd,cosBudYtd||null,cosPyYtd,'subtotal-row',false,false);
   plRows+=stmtRow('Gross Profit',gpCm,gpBudCm||null,gpPyCm||null,gpYtd,gpBudYtd||null,gpPyYtd||null,'total-row');
-  // PY net profit (gpPyCm now available)
-  let oiPyCm=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getPY('other_income.'+id),0);
-  let expPyCm=expIds.reduce((s,id)=>s+getPY('expense.'+id),0);
-  let oePyCm=['interest_paid','depreciation','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getPY('other_expense.'+id),0);
-  let npPyCm=gpPyCm+oiPyCm-expPyCm-oePyCm;
   let gpPyPctCm=incPyCm?gpPyCm/incPyCm:null;
   let gpBudPctYtd=incBudYtd?gpBudYtd/incBudYtd:null;
   plRows+=pctRow('GP %',gpPctCm,gpBudCm?gpBudCm/incBudCm:null,gpPctYtd,gpPyPctCm,gpBudPctYtd);
 
-  plRows+=`<tr class="section-row"><td colspan="10">Operating Expenses</td></tr>`;
-  expIds.forEach(id=>{
-    let act=getAct('expense.'+id),bud=getBud('expense.'+id),py=getPY('expense.'+id);
-    let actY=getActYTD('expense.'+id),budY=getBudYTD('expense.'+id),pyY=getPYYTD('expense.'+id);
-    if(act!==0||bud!==0||py!==0){
-      let label=client.reportingCOA.find(c=>c.id==='expense.'+id)?.name||id;
-      plRows+=stmtRow(label,act,bud,py,actY,budY,pyY,'',true,false);
+  // Every other reporting group, in the order set under "Reporting Groups
+  // (P&L Waterfall)" in the COA screen. Each account lands here purely by
+  // its own Reporting Group dropdown — never by its legacy Sage type — so
+  // e.g. Repairs & Maintenance (type cogs, Reporting Group "Operating
+  // Expenses") reduces Operating Profit here, not Gross Profit above.
+  wCm.groups.forEach((g,gi)=>{
+    let gYtd=wYtd.groups[gi],gBudCm=wBudCm.groups[gi],gBudYtd=wBudYtd.groups[gi],gPyCm=wPyCm.groups[gi];
+    plRows+=`<tr class="section-row"><td colspan="10">${esc(g.name)}</td></tr>`;
+    g.lines.forEach(c=>{
+      let act=getAct(c.id),bud=getBud(c.id),py=getPY(c.id);
+      let actY=getActYTD(c.id),budY=getBudYTD(c.id),pyY=getPYYTD(c.id);
+      if(act!==0||bud!==0||py!==0){
+        let favPositive=PL_INC_TYPES.includes(c.type);
+        plRows+=stmtRow(esc(c.name),act,bud,py,actY,budY,pyY,'',true,favPositive,c.id);
+      }
+    });
+    plRows+=stmtRow('Total '+g.name,g.displayTotal,gBudCm?gBudCm.displayTotal:null,gPyCm?gPyCm.displayTotal:null,gYtd?gYtd.displayTotal:0,gBudYtd?gBudYtd.displayTotal:null,null,'subtotal-row',false,!g.isCostGroup);
+    // "Operating Profit" running subtotal, shown right after whichever
+    // group is literally named "Operating Expenses" (per Johan's spec) —
+    // matches the same concept already on the Dept Cards.
+    if(g.name.trim().toLowerCase()==='operating expenses'){
+      let opProfitCm=g.profitAfter,opProfitYtd=gYtd?gYtd.profitAfter:0,opProfitBudCm=gBudCm?gBudCm.profitAfter:null,opProfitBudYtd=gBudYtd?gBudYtd.profitAfter:null,opProfitPyCm=gPyCm?gPyCm.profitAfter:null;
+      plRows+=stmtRow('Operating Profit',opProfitCm,opProfitBudCm,opProfitPyCm,opProfitYtd,opProfitBudYtd,null,'total-row');
+      let opPctCm=incCm?opProfitCm/incCm:0;
+      let opPctYtd=incYtd?opProfitYtd/incYtd:0;
+      let opPyPctCm=incPyCm?opProfitPyCm/incPyCm:null;
+      let opBudPctCm=(incBudCm&&opProfitBudCm!=null)?opProfitBudCm/incBudCm:null;
+      let opBudPctYtd=(incBudYtd&&opProfitBudYtd!=null)?opProfitBudYtd/incBudYtd:null;
+      plRows+=pctRow('OP %',opPctCm,opBudPctCm,opPctYtd,opPyPctCm,opBudPctYtd);
     }
   });
 
-  plRows+=`<tr class="section-row"><td colspan="10">Other Income</td></tr>`;
-  oiIds.forEach(id=>{
-    let act=getAct('other_income.'+id),py=getPY('other_income.'+id);
-    let actY=getActYTD('other_income.'+id),pyY=getPYYTD('other_income.'+id);
-    if(act!==0||py!==0){let label=client.reportingCOA.find(c=>c.id==='other_income.'+id)?.name||id;plRows+=stmtRow(label,act,0,py,actY,0,pyY,'',true,true);}
-  });
-
-  plRows+=`<tr class="section-row"><td colspan="10">Other Expenses</td></tr>`;
-  oeIds.forEach(id=>{
-    let act=getAct('other_expense.'+id),py=getPY('other_expense.'+id);
-    let actY=getActYTD('other_expense.'+id),pyY=getPYYTD('other_expense.'+id);
-    if(act!==0||py!==0){let label=client.reportingCOA.find(c=>c.id==='other_expense.'+id)?.name||id;plRows+=stmtRow(label,act,0,py,actY,0,pyY,'',true,false);}
-  });
-
-  plRows+=stmtRow('Net Profit Before Tax',npCm,npBudCm||null,npPyCm||null,npYtd,npBudYtd||null,null,'grand-row');
+  plRows+=stmtRow('Net Profit',npCm,npBudCm||null,npPyCm||null,npYtd,npBudYtd||null,null,'grand-row');
   let npPyPctCm=incPyCm?npPyCm/incPyCm:null;
   let npBudPctCm=incBudCm?npBudCm/incBudCm:null;
   let npBudPctYtd=incBudYtd?npBudYtd/incBudYtd:null;
@@ -3044,22 +3457,30 @@ function renderDeptReport(){
   let rm=client.settings.reportMonth;
   let ytd=ytdMonths();
   let cur=client.settings.currency||'R';
-  let selectedView=window._deptReportView||'cards';
+  let selectedView=window._deptReportView||'columns';
   let selectedMonth=window._deptReportMonth||rm;
+  let selectedBasis=window._deptColumnsBasis||'actual';
 
-  let viewBtns=['cards','consolidated','trend'].map(v=>`<button class="btn${selectedView===v?' primary':''} sm" onclick="window._deptReportView='${v}';safeRender('dept_report')">${v==='cards'?'Dept Cards':v==='consolidated'?'Consolidated Table':'GP Trend'}</button>`).join('');
+  const DEPT_VIEW_LABELS={columns:'Dept Columns',cards:'Dept Cards',consolidated:'Consolidated Table',trend:'GP Trend'};
+  let viewBtns=Object.keys(DEPT_VIEW_LABELS).map(v=>`<button class="btn${selectedView===v?' primary':''} sm" onclick="window._deptReportView='${v}';safeRender('dept_report')">${DEPT_VIEW_LABELS[v]}</button>`).join('');
   let monthSelect=`<select onchange="window._deptReportMonth=this.value;safeRender('dept_report')" style="font-size:12px;padding:5px">
     ${fyMonths().map(m=>`<option value="${m}"${m===selectedMonth?' selected':''}>${monthLabel(m)}</option>`).join('')}
   </select>`;
+  // Actual/YTD basis toggle — only meaningful for Dept Columns, which
+  // otherwise only ever shows the selected month's figures.
+  let basisBtns=`<span style="font-size:12px;color:var(--muted);margin:auto 0">View: </span>`+
+    ['actual','ytd'].map(b=>`<button class="btn${selectedBasis===b?' primary':''} sm" onclick="window._deptColumnsBasis='${b}';safeRender('dept_report')">${b==='actual'?'Actual (Month)':'YTD'}</button>`).join('');
 
   let html=`<div class="panel"><h2>Department P&L Report</h2>
   <div class="btns no-print" style="margin-bottom:14px">
     ${viewBtns}
     <span style="font-size:12px;color:var(--muted);margin:auto 0">Month: </span>${monthSelect}
+    ${selectedView==='columns'?basisBtns:''}
     <button class="btn sm no-print" onclick="window.print()">🖨 Print / PDF</button>
   </div>`;
 
   if(selectedView==='cards'){html+=renderDeptCards(selectedMonth,ytd,cur);}
+  else if(selectedView==='columns'){html+=renderDeptColumns(selectedMonth,ytd,cur,selectedBasis);}
   else if(selectedView==='consolidated'){html+=renderDeptConsolidated(selectedMonth,ytd,cur);}
   else{html+=renderDeptTrend(cur);}
 
@@ -3067,16 +3488,67 @@ function renderDeptReport(){
   document.getElementById('dept_report').innerHTML=html;
 }
 
+// Combine apportionGroupNet's (company-wide reportingCOA lines) and
+// computePmmGroupApportionment's (PMM-tagged Sage accounts reclassified onto
+// this group) per-account breakdowns into one list for ONE department, for
+// the expand/collapse detail under an apportioned row. Sign-adjusted the
+// same way apportionGroupNet's own net total is (an Other Income line
+// reduces the cost, so its share is shown as a negative contribution).
+function apportionBreakdown(groupName,deptId,period){
+  let coa=apportionGroupNet(groupName,period).byAccount.map(a=>({
+    name:a.name,total:a.total,method:a.method,
+    share:(a.apportioned[deptId]||0)*(a.type==='other_income'?-1:1),
+  }));
+  let pmm=computePmmGroupApportionment(groupName,period).byAccount.map(a=>({
+    name:a.name+' (PMM Shared)',total:a.total,method:a.method,share:a.apportioned[deptId]||0,
+  }));
+  return [...coa,...pmm].filter(a=>a.share);
+}
+// A <details>/<summary> breakdown block for one apportioned total row —
+// lets Johan expand a row to see exactly which accounts, and how much of
+// each, make up that department's share, without adding a separate screen.
+function apportionDetailHtml(items,cur){
+  if(!items.length)return '';
+  let rows=items.map(a=>`<tr><td style="padding-left:8px">${esc(a.name)}</td><td class="right" style="font-size:11px">${money(a.total,cur)}</td><td class="right" style="font-size:11px;text-transform:capitalize">${esc(a.method)}</td><td class="right" style="font-size:11px">${money(a.share,cur)}</td></tr>`).join('');
+  return `<div style="font-size:11px;color:var(--muted);margin:2px 0 4px">
+    <table style="width:100%"><thead><tr><td style="padding-left:8px">Account</td><td class="right">Company Total</td><td class="right">Method</td><td class="right">This Dept's Share</td></tr></thead>
+    <tbody>${rows}</tbody></table>
+  </div>`;
+}
+
 function deptGPTable(deptId,period,ytdMonths,cur){
+  // Which post-GP reporting group is "Operating Expenses" (if any), and
+  // every other post-GP group — resolved dynamically from
+  // client.reportingGroups (see plGroupStructure/deptGroupSplit) rather
+  // than a hardcoded name list, so this stays correct if Johan renames,
+  // reorders or adds groups in the COA editor.
+  let dgs=deptGroupSplit();
   let gp=computeDeptGP(deptId,period);
   let isApportioned=SHARED_APPORTION_DEPTS.includes(deptId);
   let apportioned=isApportioned?(computeSharedApportionment(period).apportioned[deptId]||0):0;
+  let opexApportioned=isApportioned&&dgs.opexName?
+    ((apportionGroupNet(dgs.opexName,period).net[deptId]||0)+(computePmmGroupApportionment(dgs.opexName,period).net[deptId]||0)):0;
+  let belowOpexApportioned=isApportioned?dgs.belowNames.reduce((s,g)=>
+    s+(apportionGroupNet(g,period).net[deptId]||0)+(computePmmGroupApportionment(g,period).net[deptId]||0),0):0;
 
-  // YTD: sum every COS component (and the shared apportionment) across the
-  // year-to-date months — previously only Sales was summed here.
+  // Expand/collapse detail for each apportioned row — this period only.
+  let sharedDetail=isApportioned?apportionDetailHtml(computeSharedApportionment(period).byAccount.map(a=>({name:a.name,total:a.total,method:'gp',share:a.apportioned[deptId]||0})).filter(a=>a.share),cur):'';
+  let opexDetail=isApportioned&&dgs.opexName?apportionDetailHtml(apportionBreakdown(dgs.opexName,deptId,period),cur):'';
+  let belowDetail=isApportioned?apportionDetailHtml(dgs.belowNames.flatMap(g=>apportionBreakdown(g,deptId,period)),cur):'';
+
+  // This department's share of the GP-ratio used for most apportionment
+  // (PMM Shared costs, and any 'gp'-method Operating/Administrative account).
+  let gpRatioPct=isApportioned?(computeCoreGPRatios(period).ratios[deptId]||0):0;
+
+  // YTD: sum every COS component and every apportioned pool across the
+  // year-to-date months.
   let gpYtd=ytdMonths.reduce((acc,m)=>{
     let g=computeDeptGP(deptId,m);
     let ap=isApportioned?(computeSharedApportionment(m).apportioned[deptId]||0):0;
+    let opAp=isApportioned&&dgs.opexName?
+      ((apportionGroupNet(dgs.opexName,m).net[deptId]||0)+(computePmmGroupApportionment(dgs.opexName,m).net[deptId]||0)):0;
+    let belowAp=isApportioned?dgs.belowNames.reduce((s,g2)=>
+      s+(apportionGroupNet(g2,m).net[deptId]||0)+(computePmmGroupApportionment(g2,m).net[deptId]||0),0):0;
     acc.sales+=g.sales;
     acc.openingStock+=g.openingStock;
     acc.purchases+=g.purchases;
@@ -3086,10 +3558,14 @@ function deptGPTable(deptId,period,ytdMonths,cur){
     acc.r_and_m+=g.r_and_m;
     acc.cosDirect+=g.cosDirect;
     acc.apportioned+=ap;
+    acc.opexApportioned+=opAp;
+    acc.belowOpexApportioned+=belowAp;
     acc.cos+=g.cos+ap;
     acc.gp+=g.gp-ap;
+    acc.op+=g.gp-ap-opAp;
+    acc.np+=g.gp-ap-opAp-belowAp;
     return acc;
-  },{sales:0,openingStock:0,purchases:0,closingStock:0,wages:0,consumables:0,r_and_m:0,cosDirect:0,apportioned:0,cos:0,gp:0});
+  },{sales:0,openingStock:0,purchases:0,closingStock:0,wages:0,consumables:0,r_and_m:0,cosDirect:0,apportioned:0,opexApportioned:0,belowOpexApportioned:0,cos:0,gp:0,op:0,np:0});
 
   let bud={
     sales:getDeptBudget(deptId,'sales',period),
@@ -3121,28 +3597,167 @@ function deptGPTable(deptId,period,ytdMonths,cur){
     rows.push(['Shared / Apportioned (PMM)',apportioned,0,gpYtd.apportioned]);
   }
 
+  let opAdj=gpAdj-opexApportioned;
+  let opPct=gp.sales?opAdj/gp.sales:0;
+  let opPctYtd=gpYtd.sales?gpYtd.op/gpYtd.sales:0;
+  let npAdj=opAdj-belowOpexApportioned;
+  let npPct=gp.sales?npAdj/gp.sales:0;
+  let npPctYtd=gpYtd.sales?gpYtd.np/gpYtd.sales:0;
+
+  function detailRow(detailHtml){
+    return detailHtml?`<tr><td colspan="5" style="padding:0"><details><summary style="cursor:pointer;font-size:11px;color:var(--muted);padding:2px 8px">▸ View breakdown</summary>${detailHtml}</details></td></tr>`:'';
+  }
   let tableHtml=`<table><thead><tr><th>Line</th><th class="right">Actual</th><th class="right">Budget</th><th class="right">Var</th><th class="right">YTD</th></tr></thead><tbody>`;
   rows.forEach(([lbl,act,bud2,ytd2])=>{
     let var2=bud2?(act-bud2)/Math.abs(bud2):null;
     tableHtml+=`<tr><td>${lbl}</td><td class="right">${money(act,cur)}</td><td class="right">${bud2?money(bud2,cur):'—'}</td><td class="right">${var2!==null?varBadge(var2,lbl==='Sales'?true:false):'—'}</td><td class="right">${ytd2?money(ytd2,cur):'—'}</td></tr>`;
+    if(lbl==='Shared / Apportioned (PMM)')tableHtml+=detailRow(sharedDetail);
   });
   let varBadgeHtml=gpVarPct!==null?varBadge(gpVarPct,true):'—';
   tableHtml+=`<tr class="total-row"><td><b>Gross Profit</b></td><td class="right"><b>${money(gpAdj,cur)}</b></td><td class="right"><b>${budGP?money(budGP,cur):'—'}</b></td><td class="right">${varBadgeHtml}</td><td class="right"><b>${money(gpYtd.gp,cur)}</b></td></tr>`;
   tableHtml+=`<tr class="muted"><td style="font-style:italic">GP %</td><td class="right" style="font-style:italic">${pct(gpPct)}</td><td class="right" style="font-style:italic">${pct(budGpPct)}</td><td></td><td class="right" style="font-style:italic">${pct(gpPctYtd)}</td></tr>`;
+  if(isApportioned){
+    tableHtml+=`<tr class="muted"><td style="font-style:italic">Apportion Share (GP Ratio)</td><td class="right" style="font-style:italic">${pct(gpRatioPct)}</td><td></td><td></td><td></td></tr>`;
+    tableHtml+=`<tr><td>Operating Expenses (Apportioned)</td><td class="right">${money(opexApportioned,cur)}</td><td class="right">—</td><td class="right">—</td><td class="right">${gpYtd.opexApportioned?money(gpYtd.opexApportioned,cur):'—'}</td></tr>`;
+    tableHtml+=detailRow(opexDetail);
+    tableHtml+=`<tr class="total-row"><td><b>Operating Profit</b></td><td class="right"><b>${money(opAdj,cur)}</b></td><td class="right">—</td><td class="right">—</td><td class="right"><b>${money(gpYtd.op,cur)}</b></td></tr>`;
+    tableHtml+=`<tr class="muted"><td style="font-style:italic">OP %</td><td class="right" style="font-style:italic">${pct(opPct)}</td><td></td><td></td><td class="right" style="font-style:italic">${pct(opPctYtd)}</td></tr>`;
+    tableHtml+=`<tr><td>Administrative &amp; Other (Apportioned)</td><td class="right">${money(belowOpexApportioned,cur)}</td><td class="right">—</td><td class="right">—</td><td class="right">${gpYtd.belowOpexApportioned?money(gpYtd.belowOpexApportioned,cur):'—'}</td></tr>`;
+    tableHtml+=detailRow(belowDetail);
+    tableHtml+=`<tr class="total-row"><td><b>Net Profit</b></td><td class="right"><b>${money(npAdj,cur)}</b></td><td class="right">—</td><td class="right">—</td><td class="right"><b>${money(gpYtd.np,cur)}</b></td></tr>`;
+    tableHtml+=`<tr class="muted"><td style="font-style:italic">NP %</td><td class="right" style="font-style:italic">${pct(npPct)}</td><td></td><td></td><td class="right" style="font-style:italic">${pct(npPctYtd)}</td></tr>`;
+  }
   tableHtml+='</tbody></table>';
-  return {tableHtml,gp,gpYtd,bud,budGP,gpVarPct,gpPct,gpPctYtd,gpAdj,apportioned};
+  return {tableHtml,rows,isApportioned,gp,gpYtd,bud,budGP,gpVarPct,gpPct,gpPctYtd,gpAdj,apportioned,opexApportioned,opAdj,opPct,opPctYtd,belowOpexApportioned,npAdj,npPct,npPctYtd,gpRatioPct};
+}
+
+// Same waterfall as deptGPTable/renderDeptCards, one column per reporting
+// department instead of one card per department — same numbers, laid out
+// side by side for easier department-to-department comparison. Doesn't
+// replace the cards view; it's an additional way to look at the same data.
+// Cross-department version of apportionBreakdown() (see deptGPTable) — one
+// row per contributing account with its apportioned amount in EVERY
+// department's column, for the Dept Columns view's own expand/collapse
+// (rather than one department's share at a time, as the Cards view shows).
+function apportionBreakdownAllDepts(groupName,period){
+  let coa=apportionGroupNet(groupName,period).byAccount.map(a=>{
+    let sign=a.type==='other_income'?-1:1;
+    let byDept={};
+    SHARED_APPORTION_DEPTS.forEach(id=>{byDept[id]=(a.apportioned[id]||0)*sign;});
+    return {name:a.name,total:a.total,method:a.method,byDept};
+  });
+  let pmm=computePmmGroupApportionment(groupName,period).byAccount.map(a=>({
+    name:a.name+' (PMM Shared)',total:a.total,method:a.method,byDept:a.apportioned,
+  }));
+  return [...coa,...pmm].filter(a=>Object.values(a.byDept).some(v=>v));
+}
+
+// Shows/hides one apportioned row's breakdown lines (see detailToggleRow in
+// renderDeptColumns). Plain visibility toggle, not <details> — a <details>
+// can't validly wrap bare <tr> elements as children.
+function toggleDeptDetail(key,toggleCell){
+  let rows=document.querySelectorAll('.detail-'+key);
+  if(!rows.length)return;
+  let hidden=rows[0].style.display==='none';
+  rows.forEach(r=>{r.style.display=hidden?'':'none';});
+  let arrow=document.getElementById('detail-arrow-'+key);
+  if(arrow)arrow.textContent=hidden?'▾':'▸';
+}
+
+function renderDeptColumns(period,ytdMonths,cur,basis){
+  basis=basis||'actual';
+  let isYtd=basis==='ytd';
+  let reportDepts=DEPARTMENTS.filter(d=>SHARED_APPORTION_DEPTS.includes(d.id));
+  let deptData=reportDepts.map(d=>({dept:d,...deptGPTable(d.id,period,ytdMonths,cur)}));
+  let dgs=deptGroupSplit();
+  let colCount=reportDepts.length+2;
+
+  // Row labels, in the same order the cards show them. Each row pulls the
+  // matching entry out of deptGPTable's own `rows` array by label, so this
+  // never drifts from what the cards display. rows tuples are
+  // [label, actual, budget, ytd] — pick index 1 or 3 by basis.
+  const COS_ROWS=['Sales','Opening Stock','Purchases / COS','Closing Stock','Wages & Labour','Consumables','Repairs & Maint.','Other COS','Shared / Apportioned (PMM)'];
+  let rowValueIdx=isYtd?3:1;
+
+  function lineRow(label,favPositive){
+    let vals=deptData.map(d=>{let r=d.rows.find(x=>x[0]===label);return r?r[rowValueIdx]:0;});
+    let total=vals.reduce((a,b)=>a+b,0);
+    if(vals.every(v=>!v)&&!total)return '';
+    return `<tr><td class="indent">${label}</td>${vals.map(v=>`<td class="right">${money(v,cur)}</td>`).join('')}<td class="right bold">${money(total,cur)}</td></tr>`;
+  }
+  // valFn/ytdFn: pass both an Actual accessor and a YTD accessor; the basis
+  // toggle picks which one actually gets used.
+  function totalRow(label,valFn,ytdFn,cls){
+    let vals=deptData.map(isYtd?ytdFn:valFn);
+    let total=vals.reduce((a,b)=>a+b,0);
+    return `<tr class="${cls}"><td><b>${label}</b></td>${vals.map(v=>`<td class="right"><b>${money(v,cur)}</b></td>`).join('')}<td class="right bold"><b>${money(total,cur)}</b></td></tr>`;
+  }
+  function pctRowCols(label,valFn,ytdFn){
+    let vals=deptData.map(isYtd?(ytdFn||valFn):valFn);
+    return `<tr class="muted"><td style="font-style:italic;padding-left:18px">${label}</td>${vals.map(v=>`<td class="right" style="font-style:italic">${pct(v)}</td>`).join('')}<td class="right" style="font-style:italic"></td></tr>`;
+  }
+  // Expand/collapse detail under an apportioned total row — one line per
+  // contributing account, with that account's apportioned amount in every
+  // department's column (plus a Total column). These are real <tr> rows in
+  // THIS SAME table (not a nested table in a single cell), so every amount
+  // lines up under its department's column exactly like every other row;
+  // a <details> can't validly wrap bare <tr>s, so visibility is toggled
+  // with a small onclick instead (see toggleDeptDetail()).
+  let detailKeyCounter=0;
+  function detailToggleRow(label,items){
+    if(!items.length)return '';
+    let key='dd'+(detailKeyCounter++);
+    let bodyRows=items.map(a=>{
+      let vals=reportDepts.map(d=>a.byDept[d.id]||0);
+      let total=vals.reduce((s,v)=>s+v,0);
+      return `<tr class="muted detail-${key}" style="display:none"><td class="indent" style="padding-left:24px;font-size:11px">${esc(a.name)} <span style="text-transform:capitalize">(${esc(a.method)})</span></td>${vals.map(v=>`<td class="right" style="font-size:11px">${money(v,cur)}</td>`).join('')}<td class="right" style="font-size:11px">${money(total,cur)}</td></tr>`;
+    }).join('');
+    let toggleRow=`<tr><td colspan="${colCount}" style="cursor:pointer;font-size:11px;color:var(--muted);padding:2px 8px" onclick="toggleDeptDetail('${key}',this)"><span id="detail-arrow-${key}">▸</span> View breakdown of ${esc(label)}</td></tr>`;
+    return toggleRow+bodyRows;
+  }
+
+  let html=`<div style="overflow:auto">`+
+    (isYtd?`<p class="muted" style="font-size:12px;margin-bottom:8px">Showing Year-to-Date figures (through ${monthLabel(period)}). Account-level breakdowns below are only available in Actual (Month) view.</p>`:'')+
+    `<table class="stmt">
+    <thead><tr>
+      <th>Line Item</th>
+      ${reportDepts.map(d=>`<th class="right" style="background:${d.color};color:#fff;min-width:120px">${d.label}</th>`).join('')}
+      <th class="right" style="background:#374151;color:#fff;min-width:120px">TOTAL</th>
+    </tr></thead><tbody>`;
+
+  COS_ROWS.forEach(label=>{
+    html+=lineRow(label);
+    if(label==='Shared / Apportioned (PMM)'&&!isYtd){
+      let items=computeSharedApportionment(period).byAccount.map(a=>({name:a.name,total:a.total,method:'gp',byDept:a.apportioned}));
+      html+=detailToggleRow('Shared / Apportioned (PMM)',items);
+    }
+  });
+  html+=totalRow('Gross Profit',d=>d.gpAdj,d=>d.gpYtd.gp,'total-row');
+  html+=pctRowCols('GP %',d=>d.gpPct,d=>d.gpPctYtd);
+  html+=pctRowCols('Apportion Share (GP Ratio)',d=>d.gpRatioPct);
+  html+=totalRow('Operating Expenses (Apportioned)',d=>d.opexApportioned,d=>d.gpYtd.opexApportioned,'');
+  if(dgs.opexName&&!isYtd)html+=detailToggleRow('Operating Expenses (Apportioned)',apportionBreakdownAllDepts(dgs.opexName,period));
+  html+=totalRow('Operating Profit',d=>d.opAdj,d=>d.gpYtd.op,'total-row');
+  html+=pctRowCols('OP %',d=>d.opPct,d=>d.opPctYtd);
+  html+=totalRow('Administrative & Other (Apportioned)',d=>d.belowOpexApportioned,d=>d.gpYtd.belowOpexApportioned,'');
+  if(!isYtd)html+=detailToggleRow('Administrative & Other (Apportioned)',dgs.belowNames.flatMap(g=>apportionBreakdownAllDepts(g,period)));
+  html+=totalRow('Net Profit',d=>d.npAdj,d=>d.gpYtd.np,'grand-row');
+  html+=pctRowCols('NP %',d=>d.npPct,d=>d.npPctYtd);
+  html+='</tbody></table></div>';
+  return html;
 }
 
 function renderDeptCards(period,ytd,cur){
   let reportDepts=DEPARTMENTS.filter(function(d){return d.id==='bm'||d.id==='im'||d.id==='tr'||d.id==='td';});
   let html='<div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">';
-  let cardGP={};
+  let cardGP={},cardNP={};
   reportDepts.forEach(function(dept){
-    let {tableHtml,gp,gpPct,gpAdj}=deptGPTable(dept.id,period,ytd,cur);
+    let {tableHtml,gp,gpPct,gpAdj,npAdj,npPct}=deptGPTable(dept.id,period,ytd,cur);
     cardGP[dept.id]=gpAdj;
+    cardNP[dept.id]=npAdj;
     html+='<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff">'+
       '<div class="dept-card-hdr '+dept.hdrClass+'" style="padding:14px 18px;font-size:18px;font-weight:bold;color:#fff">'+dept.label+
-        '<span style="float:right;font-size:15px;font-weight:normal">GP: '+money(gpAdj,cur)+' ('+pct(gpPct)+')</span>'+
+        '<span style="float:right;font-size:15px;font-weight:normal">GP: '+money(gpAdj,cur)+' ('+pct(gpPct)+')&nbsp;&nbsp;·&nbsp;&nbsp;NP: '+money(npAdj,cur)+' ('+pct(npPct)+')</span>'+
       '</div>'+
       '<div style="padding:16px">'+tableHtml+'</div>'+
     '</div>';
@@ -3150,13 +3765,16 @@ function renderDeptCards(period,ytd,cur){
   html+='</div>';
 
   // Totals summary — the four reporting depts, after each one's share of
-  // PMM (Shared) COS has been apportioned in
+  // PMM (Shared) COS and of Operating/Administrative Expenses has been apportioned in
   let totalSalesCm=reportDepts.reduce(function(s,d){return s+computeDeptGP(d.id,period).sales;},0);
   let totalGPCm=reportDepts.reduce(function(s,d){return s+cardGP[d.id];},0);
+  let totalNPCm=reportDepts.reduce(function(s,d){return s+cardNP[d.id];},0);
   let totalGPPct=totalSalesCm?totalGPCm/totalSalesCm:0;
+  let totalNPPct=totalSalesCm?totalNPCm/totalSalesCm:0;
   html+='<div style="background:var(--brand);color:#fff;border-radius:10px;padding:16px;display:flex;gap:32px;flex-wrap:wrap">'+
     '<div><div style="font-size:14px;opacity:.8">Total Revenue — '+monthLabel(period)+'</div><div style="font-size:26px;font-weight:bold">'+money(totalSalesCm,cur)+'</div></div>'+
     '<div><div style="font-size:14px;opacity:.8">Total Gross Profit</div><div style="font-size:26px;font-weight:bold">'+money(totalGPCm,cur)+' ('+pct(totalGPPct)+')</div></div>'+
+    '<div><div style="font-size:14px;opacity:.8">Total Net Profit</div><div style="font-size:26px;font-weight:bold">'+money(totalNPCm,cur)+' ('+pct(totalNPPct)+')</div></div>'+
   '</div>';
   return html;
 }
@@ -3166,7 +3784,7 @@ function renderDeptConsolidated(period,ytd,cur){
     <thead>
       <tr>
         <th>Line Item</th>
-        ${DEPARTMENTS.map(d=>`<th class="right" style="background:${d.color};color:#fff;min-width:110px">${d.label}</th>`).join('')}
+        ${REPORT_DEPARTMENTS.map(d=>`<th class="right" style="background:${d.color};color:#fff;min-width:110px">${d.label}</th>`).join('')}
         <th class="right" style="background:#374151;color:#fff;min-width:110px">TOTAL</th>
       </tr>
     </thead><tbody>`;
@@ -3178,14 +3796,14 @@ function renderDeptConsolidated(period,ytd,cur){
   ];
 
   ROLES.forEach(([roleId,roleLabel])=>{
-    let vals=DEPARTMENTS.map(d=>getDeptValue(d.id,roleId,period));
+    let vals=REPORT_DEPARTMENTS.map(d=>getDeptValue(d.id,roleId,period));
     let total=vals.reduce((a,b)=>a+b,0);
     if(total===0&&vals.every(v=>v===0))return;
     html+=`<tr><td class="indent">${roleLabel}</td>${vals.map(v=>`<td class="right">${money(v,cur)}</td>`).join('')}<td class="right bold">${money(total,cur)}</td></tr>`;
   });
 
-  let gpVals=DEPARTMENTS.map(d=>computeDeptGP(d.id,period).gp);
-  let salesVals=DEPARTMENTS.map(d=>computeDeptGP(d.id,period).sales);
+  let gpVals=REPORT_DEPARTMENTS.map(d=>computeDeptGP(d.id,period).gp);
+  let salesVals=REPORT_DEPARTMENTS.map(d=>computeDeptGP(d.id,period).sales);
   let totalGP=gpVals.reduce((a,b)=>a+b,0);
   let totalSales=salesVals.reduce((a,b)=>a+b,0);
   html+=`<tr class="total-row"><td><b>Gross Profit</b></td>${gpVals.map(v=>`<td class="right"><b>${money(v,cur)}</b></td>`).join('')}<td class="right bold">${money(totalGP,cur)}</td></tr>`;
@@ -3198,10 +3816,10 @@ function renderDeptConsolidated(period,ytd,cur){
 function renderDeptTrend(cur){
   let months=fyMonths();
   let html=`<div style="overflow:auto"><table class="stmt">
-    <thead><tr><th>Month</th>${DEPARTMENTS.map(d=>`<th class="right" style="min-width:80px">${d.label} GP</th><th class="right">GP%</th>`).join('')}<th class="right">Total GP</th><th class="right">Total GP%</th></tr></thead>
+    <thead><tr><th>Month</th>${REPORT_DEPARTMENTS.map(d=>`<th class="right" style="min-width:80px">${d.label} GP</th><th class="right">GP%</th>`).join('')}<th class="right">Total GP</th><th class="right">Total GP%</th></tr></thead>
     <tbody>`;
   months.forEach(m=>{
-    let vals=DEPARTMENTS.map(d=>computeDeptGP(d.id,m));
+    let vals=REPORT_DEPARTMENTS.map(d=>computeDeptGP(d.id,m));
     let totalGP=vals.reduce((s,v)=>s+v.gp,0);
     let totalSales=vals.reduce((s,v)=>s+v.sales,0);
     html+=`<tr><td>${monthLabel(m)}</td>`;
@@ -3528,59 +4146,36 @@ function renderDashboard(){
   let hasPL=Object.keys(client.raw.pl.accounts||{}).length>0;
   let hasBS=Object.keys(client.raw.bs.accounts||{}).length>0;
 
-  // Compute key figures
-  let incCm=getCoaValue('income.sales',rm)+getCoaValue('income.other',rm);
-  let cosCm=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((s,id)=>s+getCoaValue('cogs.'+id,rm),0);
-  let gpCm=incCm-cosCm;
+  // Compute key figures — same company waterfall engine as the Statement
+  // tab (computeCompanyWaterfall), so both tabs always agree.
+  function dbAct(id){return getCoaValue(id,rm);}
+  function dbActYtd(id){return ytd.reduce((s,m)=>s+getCoaValue(id,m),0);}
+  function dbBud(id){return getBudget(id,rm);}
+  function dbBudYtd(id){return ytd.reduce((s,m)=>s+getBudget(id,m),0);}
+  function dbPy(id){return getCoaValue(id,rm,client.raw.pl_py);}
+  function dbPyYtd(id){return ytd.reduce((s,m)=>s+getCoaValue(id,m,client.raw.pl_py),0);}
+
+  let wCm=computeCompanyWaterfall(dbAct);
+  let wYtd=computeCompanyWaterfall(dbActYtd);
+  let wBudCm=computeCompanyWaterfall(dbBud);
+  let wBudYtd=computeCompanyWaterfall(dbBudYtd);
+  let wPyCm=computeCompanyWaterfall(dbPy);
+  let wPyYtd=computeCompanyWaterfall(dbPyYtd);
+
+  let incCm=wCm.inc,gpCm=wCm.gp,npCm=wCm.np;
   let gpPctCm=incCm?gpCm/incCm:0;
-  let expIds=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'];
-  let expCm=expIds.reduce((s,id)=>s+getCoaValue('expense.'+id,rm),0);
-  let oiCm=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getCoaValue('other_income.'+id,rm),0);
-  let oeCm=['interest_paid','depreciation','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getCoaValue('other_expense.'+id,rm),0);
-  let npCm=gpCm+oiCm-expCm-oeCm;
   let npPctCm=incCm?npCm/incCm:0;
 
-  let incYtd=ytd.reduce((s,m)=>s+getCoaValue('income.sales',m)+getCoaValue('income.other',m),0);
-  let gpYtd=incYtd-ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m),0),0);
-  let npYtd=gpYtd+ytd.reduce((s,m)=>s+['interest_received','discounts_received','etd_deduction','recoveries'].reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m),0),0)
-            -ytd.reduce((s,m)=>s+expIds.reduce((ss,id)=>ss+getCoaValue('expense.'+id,m),0),0)
-            -ytd.reduce((s,m)=>s+['interest_paid','depreciation','bad_debts','forex','fines','income_tax'].reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m),0),0);
+  let incYtd=wYtd.inc,gpYtd=wYtd.gp,npYtd=wYtd.np;
 
-  // Budget
-  let incBudCm=getBudget('income.sales',rm)+getBudget('income.other',rm);
-  let cosBudCm=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((s,id)=>s+getBudget('cogs.'+id,rm),0);
-  let gpBudCm=incBudCm-cosBudCm;
-  let incBudYtd=ytd.reduce((s,m)=>s+getBudget('income.sales',m)+getBudget('income.other',m),0);
-  let cosBudYtd=ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((ss,id)=>ss+getBudget('cogs.'+id,m),0),0);
-  let gpBudYtd=incBudYtd-cosBudYtd;
-  // NP budget for dashboard cards
-  let expBudCm_db=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'].reduce((s,id)=>s+getBudget('expense.'+id,rm),0);
-  let expBudYtd_db=ytd.reduce((s,m)=>s+['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'].reduce((ss,id)=>ss+getBudget('expense.'+id,m),0),0);
-  let npBudCm=gpBudCm-expBudCm_db;  // simplified: GP budget - opex budget
-  let npBudYtd=gpBudYtd-expBudYtd_db;
+  let incBudCm=wBudCm.inc,gpBudCm=wBudCm.gp,npBudCm=wBudCm.np;
+  let incBudYtd=wBudYtd.inc,gpBudYtd=wBudYtd.gp,npBudYtd=wBudYtd.np;
 
-  // PY — current month
-  let incPyCm=getCoaValue('income.sales',rm,client.raw.pl_py)+getCoaValue('income.other',rm,client.raw.pl_py);
-  let cosPyCm=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((s,id)=>s+getCoaValue('cogs.'+id,rm,client.raw.pl_py),0);
-  let gpPyCm=incPyCm-cosPyCm;
-  let expIds_db=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'];
-  let oiIds_db=['interest_received','discounts_received','etd_deduction','recoveries'];
-  let oeIds_db=['interest_paid','depreciation','bad_debts','forex','fines','income_tax'];
-  let expPyCm=expIds_db.reduce((s,id)=>s+getCoaValue('expense.'+id,rm,client.raw.pl_py),0);
-  let oiPyCm=oiIds_db.reduce((s,id)=>s+getCoaValue('other_income.'+id,rm,client.raw.pl_py),0);
-  let oePyCm=oeIds_db.reduce((s,id)=>s+getCoaValue('other_expense.'+id,rm,client.raw.pl_py),0);
-  let npPyCm=gpPyCm+oiPyCm-expPyCm-oePyCm;
-  // PY — YTD
-  let incPyYtd=ytd.reduce((s,m)=>s+getCoaValue('income.sales',m,client.raw.pl_py)+getCoaValue('income.other',m,client.raw.pl_py),0);
-  let cosPyYtd=ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m,client.raw.pl_py),0),0);
-  let gpPyYtd=incPyYtd-cosPyYtd;
-  let expPyYtd=ytd.reduce((s,m)=>s+expIds_db.reduce((ss,id)=>ss+getCoaValue('expense.'+id,m,client.raw.pl_py),0),0);
-  let oiPyYtd=ytd.reduce((s,m)=>s+oiIds_db.reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m,client.raw.pl_py),0),0);
-  let oePyYtd=ytd.reduce((s,m)=>s+oeIds_db.reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m,client.raw.pl_py),0),0);
-  let npPyYtd=gpPyYtd+oiPyYtd-expPyYtd-oePyYtd;
+  let incPyCm=wPyCm.inc,gpPyCm=wPyCm.gp,npPyCm=wPyCm.np;
+  let incPyYtd=wPyYtd.inc,gpPyYtd=wPyYtd.gp,npPyYtd=wPyYtd.np;
 
   // Dept GP cards
-  let deptCards=DEPARTMENTS.map(d=>{
+  let deptCards=REPORT_DEPARTMENTS.map(d=>{
     let dGP=computeDeptGP(d.id,rm);
     let dSales=dGP.sales;
     let dGPv=dGP.gp;
@@ -3600,6 +4195,48 @@ function renderDashboard(){
       </div>
     </div>`;
   }).join('');
+
+  // Department Contribution — each of the four reporting departments'
+  // share of Turnover, Gross Profit, Operating Profit and Net Profit,
+  // using the same apportioned figures as the Dept P&L Report's Dept
+  // Cards (deptGPTable). Normalised against the FOUR DEPARTMENTS' OWN
+  // combined total, not the full company figure: department-level GP is
+  // built from Sage's own department tagging (SAGE_DEPT_MAP), which is a
+  // separate, narrower traceability system than the company-wide Reporting
+  // COA waterfall — a small residual (untagged costs, PMM Shared)
+  // always sits outside any single department, and dividing by the full
+  // company Operating Profit specifically (often a thin residual figure)
+  // can blow the percentages up past 100%. Dividing by the four
+  // departments' own total keeps every percentage meaningful and always
+  // summing to 100%.
+  let contribDepts=SHARED_APPORTION_DEPTS.map(id=>{
+    let d=DEPARTMENTS.find(x=>x.id===id);
+    let dt=deptGPTable(id,rm,ytd,cur);
+    return {id,label:d.label,color:d.color,sales:dt.gp.sales,gp:dt.gpAdj,op:dt.opAdj,np:dt.npAdj};
+  });
+  let contribTotals={
+    sales:contribDepts.reduce((s,d)=>s+d.sales,0),
+    gp:contribDepts.reduce((s,d)=>s+d.gp,0),
+    op:contribDepts.reduce((s,d)=>s+d.op,0),
+    np:contribDepts.reduce((s,d)=>s+d.np,0)
+  };
+  function contribPct(v,total){return total?v/total:0;}
+  let contribRows=contribDepts.map(r=>`<tr>
+      <td style="font-weight:bold;color:${r.color}">${esc(r.label)}</td>
+      <td class="right">${pct(contribPct(r.sales,contribTotals.sales))}</td>
+      <td class="right">${pct(contribPct(r.gp,contribTotals.gp))}</td>
+      <td class="right">${pct(contribPct(r.op,contribTotals.op))}</td>
+      <td class="right">${pct(contribPct(r.np,contribTotals.np))}</td>
+    </tr>`).join('');
+  let deptContribCard=hasPL?`<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px">
+    <h3 style="margin:0 0 6px;font-size:20px;font-weight:bold">Department Contribution — ${monthLabel(rm)}</h3>
+    <p class="muted" style="font-size:12px;margin-bottom:10px">Each department's share of the four reporting departments' combined Turnover, Gross Profit, Operating Profit and Net Profit (after PMM Shared and Operating/Administrative apportionment). Excludes PMM (Shared), which is apportioned into the departments rather than broken out on its own.</p>
+    <div style="overflow:auto">
+    <table class="stmt" style="min-width:480px"><thead><tr>
+      <th>Department</th><th class="right">% Turnover</th><th class="right">% GP</th><th class="right">% OP</th><th class="right">% NP</th>
+    </tr></thead><tbody>${contribRows}</tbody></table>
+    </div>
+  </div>`:'';
 
   // Monthly trend bars (last 6 months of FY)
   let allFY=fyMonths();
@@ -3744,15 +4381,17 @@ function renderDashboard(){
           +'</div>';
       }).join('');
 
-      // GPLR: GP / Total Labour
-      let gpCm2=incCm-cosCm;
+      // GPLR: GP / Total Labour — GP here is the same Gross Profit as the
+      // rest of this tab (gpCm/gpYtd from computeCompanyWaterfall above),
+      // not a separately-recomputed figure.
+      let gpCm2=gpCm;
       let labour=getCoaValue('cogs.wages',rm)+getCoaValue('expense.director_remuneration',rm)+getCoaValue('expense.salaries_wages',rm);
       let gplr=labour?gpCm2/labour:null;
       let gplrTarget=client.kpiBenchmarks.gplr_target||2.0;
       let labourPY=getCoaValue('cogs.wages',rm,client.raw.pl_py)+getCoaValue('expense.director_remuneration',rm,client.raw.pl_py)+getCoaValue('expense.salaries_wages',rm,client.raw.pl_py);
-      let gpCmPY=incPyCm-((['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce(function(s,id){return s+getCoaValue('cogs.'+id,rm,client.raw.pl_py);},0)));
+      let gpCmPY=gpPyCm;
       let gplrPY=labourPY?gpCmPY/labourPY:null;
-      let gpYtd2=incYtd-ytd.reduce(function(s,m){return s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce(function(ss,id){return ss+getCoaValue('cogs.'+id,m);},0);},0);
+      let gpYtd2=gpYtd;
       let labourYtd=ytd.reduce(function(s,m){return s+getCoaValue('cogs.wages',m)+getCoaValue('expense.director_remuneration',m)+getCoaValue('expense.salaries_wages',m);},0);
       let gplrYtd=labourYtd?gpYtd2/labourYtd:null;
       let gplrOk=gplr!==null&&gplr>=gplrTarget;
@@ -3810,6 +4449,8 @@ function renderDashboard(){
       </div>
     </div>
 
+    ${deptContribCard}
+
     <!-- Debt Schedule Snapshot -->
     ${(function(){
       let facs=dsFacilities();
@@ -3858,14 +4499,10 @@ function qcChecks(){
   let hasBSData=Object.keys(client.raw.bs.accounts||{}).length>0;
   if(hasBSData){
     let bsNP=getCoaValue('equity.current_year',rm,client.raw.bs)||0;
-    // YTD net profit from P&L
-    let incYtd=ytd.reduce((s,m)=>s+getCoaValue('income.sales',m)+getCoaValue('income.other',m),0);
-    let cosYtd=ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct'].reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m),0),0);
-    let expIds=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water'];
-    let expYtd=ytd.reduce((s,m)=>s+expIds.reduce((ss,id)=>ss+getCoaValue('expense.'+id,m),0),0);
-    let oiYtd=ytd.reduce((s,m)=>s+['interest_received','discounts_received','etd_deduction','recoveries'].reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m),0),0);
-    let oeYtd=ytd.reduce((s,m)=>s+['interest_paid','depreciation','bad_debts','forex','fines','income_tax'].reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m),0),0);
-    let plNP=incYtd-cosYtd+oiYtd-expYtd-oeYtd;
+    // YTD net profit from P&L — same company waterfall engine as the
+    // Statement/Dashboard (computeCompanyWaterfall), so this check reflects
+    // every P&L account exactly as the reports show it.
+    let plNP=computeCompanyWaterfall(id=>ytd.reduce((s,m)=>s+getCoaValue(id,m),0)).np;
     let diff=Math.abs(bsNP-plNP);
     let pctDiff=Math.abs(plNP)>100?diff/Math.abs(plNP):0;
     checks.push({id:'np_bs',label:'P&L Net Profit YTD agrees to BS Current Year Earnings',
@@ -5006,11 +5643,11 @@ function renderEstitrackRecon(){
 
   const DEPTS=[
     {id:'bm',label:'Blow Moulding'},{id:'im',label:'Injection Moulding'},
-    {id:'td',label:'Dispensing Tubes'},{id:'tda',label:'Extrusion'}
+    {id:'td',label:'Dispensing Tubes'}
   ];
 
   // Get Pastel total from Sage P&L (total purchases across all depts)
-  let pastelTotal=['bm','im','td','tda','pmm'].reduce((s,d)=>s+getDeptValue(d,'purchases',rm),0);
+  let pastelTotal=['bm','im','td','pmm'].reduce((s,d)=>s+getDeptValue(d,'purchases',rm),0);
 
   let er=client.estitrackRecon[rm]||{};
 
