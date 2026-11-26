@@ -2853,26 +2853,26 @@ function renderReport(){
   let gpPctCm=incCm?gpCm/incCm:0;
   let gpPctYtd=incYtd?gpYtd/incYtd:0;
 
-  let gpBudCm=incBudCm-(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((s,r)=>s+getBud('cogs.'+r),0));
-  let gpBudYtd=incBudYtd-(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((s,r)=>s+getBudYTD('cogs.'+r),0));
+  let gpBudCm=incBudCm-(XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((s,r)=>s+getBud('cogs.'+r),0));
+  let gpBudYtd=incBudYtd-(XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((s,r)=>s+getBudYTD('cogs.'+r),0));
   // NP budget = GP budget + other income budget - opex budget - other expense budget
-  let expBudCm=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'].reduce((s,id)=>s+getBud('expense.'+id),0);
-  let expBudYtd=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'].reduce((s,id)=>s+getBudYTD('expense.'+id),0);
-  let oiBudCm=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getBud('other_income.'+id),0);
-  let oiBudYtd=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getBudYTD('other_income.'+id),0);
-  let oeBudCm=['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getBud('other_expense.'+id),0);
-  let oeBudYtd=['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getBudYTD('other_expense.'+id),0);
+  let expBudCm=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.').reduce((s,id)=>s+getBud('expense.'+id),0);
+  let expBudYtd=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.').reduce((s,id)=>s+getBudYTD('expense.'+id),0);
+  let oiBudCm=XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.').reduce((s,id)=>s+getBud('other_income.'+id),0);
+  let oiBudYtd=XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.').reduce((s,id)=>s+getBudYTD('other_income.'+id),0);
+  let oeBudCm=XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.').reduce((s,id)=>s+getBud('other_expense.'+id),0);
+  let oeBudYtd=XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.').reduce((s,id)=>s+getBudYTD('other_expense.'+id),0);
   let npBudCm=gpBudCm+oiBudCm-expBudCm-oeBudCm;
   let npBudYtd=gpBudYtd+oiBudYtd-expBudYtd-oeBudYtd;
   let gpVarCm=gpBudCm?((gpCm-gpBudCm)/Math.abs(gpBudCm)):0;
   let gpVarYtd=gpBudYtd?((gpYtd-gpBudYtd)/Math.abs(gpBudYtd)):0;
 
-  let expIds=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'];
+  let expIds=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.');
   let expCm=expIds.reduce((s,id)=>s+getAct('expense.'+id),0);
   let expYtd=expIds.reduce((s,id)=>s+getActYTD('expense.'+id),0);
 
-  let oeIds=['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'];
-  let oiIds=['interest_received','discounts_received','etd_deduction','recoveries'];
+  let oeIds=XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.');
+  let oiIds=XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.');
   let oiCm=oiIds.reduce((s,id)=>s+getAct('other_income.'+id),0);
   let oiYtd=oiIds.reduce((s,id)=>s+getActYTD('other_income.'+id),0);
   let oeCm=oeIds.reduce((s,id)=>s+getAct('other_expense.'+id),0);
@@ -2950,7 +2950,7 @@ function renderReport(){
   plRows+=stmtRow('Sales & Revenue',incCm,incBudCm||null,incPyCm||null,incYtd,incBudYtd||null,incPyYtd||null,'','',true,'income.sales');
 
   plRows+=`<tr class="section-row"><td colspan="10">Cost of Sales</td></tr>`;
-  let cosLineIds=['opening_stock','purchases','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables','closing_stock'];
+  let cosLineIds=XL(['opening_stock','purchases','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables','closing_stock'],'cogs.');
   cosLineIds.forEach(id=>{
     let act=getAct('cogs.'+id),bud=getBud('cogs.'+id),py=getPY('cogs.'+id);
     let actY=getActYTD('cogs.'+id),budY=getBudYTD('cogs.'+id);
@@ -2967,9 +2967,9 @@ function renderReport(){
   let gpPyYtd=getPYYTD('income.sales')+getPYYTD('income.other')-cosPyYtd;
   plRows+=stmtRow('Gross Profit',gpCm,gpBudCm||null,gpPyCm||null,gpYtd,gpBudYtd||null,gpPyYtd||null,'total-row');
   // PY net profit (gpPyCm now available)
-  let oiPyCm=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getPY('other_income.'+id),0);
+  let oiPyCm=XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.').reduce((s,id)=>s+getPY('other_income.'+id),0);
   let expPyCm=expIds.reduce((s,id)=>s+getPY('expense.'+id),0);
-  let oePyCm=['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getPY('other_expense.'+id),0);
+  let oePyCm=XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.').reduce((s,id)=>s+getPY('other_expense.'+id),0);
   let npPyCm=gpPyCm+oiPyCm-expPyCm-oePyCm;
   let gpPyPctCm=incPyCm?gpPyCm/incPyCm:null;
   let gpBudPctYtd=incBudYtd?gpBudYtd/incBudYtd:null;
@@ -3239,6 +3239,18 @@ function renderDeptTrend(cur){
 // ═══════════════════════════════════════════════════════
 // Returns PPE classes defined in the client's reporting COA
 // NOTE: does NOT call ensureClientDefaults to avoid recursion
+// Report line lists are extended automatically with any line added to the Reporting COA
+function XL(list,prefix){
+  let out=list.slice();
+  const skip=['shared_wages','shared_repairs_and_maintenance','shared_consumables'];
+  (client.reportingCOA||[]).forEach(c=>{
+    if(!c||!c.id||!c.id.startsWith(prefix))return;
+    let id=c.id.slice(prefix.length);
+    if(!id||out.includes(id)||(prefix!=='cogs.'&&skip.includes(id)))return;
+    if(prefix==='cogs.'&&skip.includes(id))return;
+    out.push(id);});
+  return out;
+}
 function getPPEClasses(){
   let seen={};
   let classes=[];
@@ -3288,95 +3300,90 @@ function ensurePPENote(){
   return client.notes.find(n=>n.type==='ppe');
 }
 
-function renderPPENoteContent(cur){
-  let ppeClasses=getPPEClasses();
-  if(!ppeClasses.length)return '<p class="muted">No PPE classes found in Reporting COA. Add PPE cost/acc_dep/dep lines in the COA editor.</p>';
+// Shared PPE figures (one entry per asset class), TutinBooks-style
+function ppeFigures(){
   let hasPY=Object.keys(client.raw.bs_py.accounts||{}).length>0;
-  let html='';
-
-  ppeClasses.forEach(p=>{
+  let rows=[];
+  getPPEClasses().forEach(p=>{
     let costCY=getBSValue(p.costId,true);
-    let accDepCY=getBSValue(p.accDepId,true);
-    let nbvCY=costCY-Math.abs(accDepCY);
-    let costPY=hasPY?getBSValue(p.costId,false):null;
-    let accDepPY=hasPY?getBSValue(p.accDepId,false):null;
-    let nbvPY=hasPY?(costPY-Math.abs(accDepPY)):null;
-    let depYTD=getPLYTDValue(p.depId);
-    if(!costCY&&!accDepCY&&(!hasPY||(!costPY&&!accDepPY)))return;
+    let accDepCY=Math.abs(getBSValue(p.accDepId,true));
+    let costPY=hasPY?getBSValue(p.costId,false):0;
+    let accDepPY=hasPY?Math.abs(getBSValue(p.accDepId,false)):0;
+    if(!costCY&&!accDepCY&&!costPY&&!accDepPY)return;
     let noteKey='ppe_'+p.key;
     if(!client.ppeNotes[noteKey])client.ppeNotes[noteKey]={additions:0,disposals:0,note:''};
     let pn=client.ppeNotes[noteKey];
-    let additions=num(pn.additions);
-    let disposals=num(pn.disposals);
-    let reconClosing=nbvPY!==null?(nbvPY+additions-disposals-Math.abs(depYTD)):null;
-    let reconDiff=reconClosing!==null?(nbvCY-reconClosing):null;
-    let reconFlag=reconDiff!==null&&Math.abs(reconDiff)>5
-      ?`<span style="color:var(--bad);font-weight:bold;font-size:11px"> ⚠ Recon diff: ${money(reconDiff,cur)}</span>`:'';
-
-    html+=`<div style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)">
-      <b style="font-size:13px">${esc(p.label)}</b>${reconFlag}
-      <table class="stmt" style="margin-top:8px">
-        <thead><tr><th></th><th class="right" style="min-width:100px">Cost</th><th class="right" style="min-width:100px">Acc. Dep</th><th class="right" style="min-width:100px">NBV</th></tr></thead>
-        <tbody>`;
-    if(hasPY&&nbvPY!==null){
-      html+=`<tr><td>Opening balance (prior year BS)</td><td class="right">${money(costPY,cur)}</td><td class="right">(${money(Math.abs(accDepPY),cur)})</td><td class="right">${money(nbvPY,cur)}</td></tr>`;
-    }
-    html+=`<tr><td>Additions <input type="number" value="${additions}" style="width:110px;padding:3px 6px;font-size:12px;margin-left:8px;border:1px solid #d1d5db;border-radius:4px" onchange="if(!client.ppeNotes['${noteKey}'])client.ppeNotes['${noteKey}']={};client.ppeNotes['${noteKey}'].additions=+this.value;renderNotes()"></td><td class="right">${money(additions,cur)}</td><td class="right">—</td><td class="right">${money(additions,cur)}</td></tr>`;
-    html+=`<tr><td>Disposals (at NBV) <input type="number" value="${disposals}" style="width:110px;padding:3px 6px;font-size:12px;margin-left:8px;border:1px solid #d1d5db;border-radius:4px" onchange="if(!client.ppeNotes['${noteKey}'])client.ppeNotes['${noteKey}']={};client.ppeNotes['${noteKey}'].disposals=+this.value;renderNotes()"></td><td class="right">—</td><td class="right">—</td><td class="right">(${money(disposals,cur)})</td></tr>`;
-    html+=`<tr><td>Depreciation (P&L YTD)</td><td class="right">—</td><td class="right">(${money(Math.abs(depYTD),cur)})</td><td class="right">(${money(Math.abs(depYTD),cur)})</td></tr>`;
-    html+=`<tr class="total-row"><td><b>Closing balance (current BS)</b></td><td class="right"><b>${money(costCY,cur)}</b></td><td class="right"><b>(${money(Math.abs(accDepCY),cur)})</b></td><td class="right"><b>${money(nbvCY,cur)}</b></td></tr>`;
-    html+=`</tbody></table>
-      <div style="margin-top:6px"><label style="font-size:11px">Note comment</label>
-      <textarea rows="2" style="width:100%;font-size:12px;padding:5px;border:1px solid var(--line);border-radius:6px" onchange="client.ppeNotes['${noteKey}'].note=this.value">${esc(pn.note||'')}</textarea>
-      </div>
-    </div>`;
+    let autoAdds=hasPY?(costCY-costPY):0;
+    let manual=pn.additionsManual===true||(pn.additionsManual===undefined&&num(pn.additions)!==0);
+    let adds=manual?num(pn.additions):autoAdds;
+    let disp=num(pn.disposals);
+    let dep=Math.abs(getPLYTDValue(p.depId));
+    let openCV=costPY-accDepPY;
+    let closeCV=costCY-accDepCY;
+    rows.push({p,noteKey,pn,costCY,accDepCY,openCV,adds,autoAdds,manual,disp,dep,closeCV,
+      diff:hasPY?(closeCV-(openCV+adds-disp-dep)):null});
   });
-  return html||'<p class="muted">No PPE balances found. Import the Balance Sheet to populate.</p>';
+  return {hasPY,rows};
 }
+
+function renderPPENoteContent(cur){
+  if(!getPPEClasses().length)return '<p class="muted">No PPE classes found in Reporting COA. Add PPE cost/acc_dep/dep lines in the COA editor.</p>';
+  let f=ppeFigures();
+  if(!f.rows.length)return '<p class="muted">No PPE balances found. Import the Balance Sheet to populate.</p>';
+  let T=(k)=>f.rows.reduce((s,r)=>s+r[k],0);
+  let inp='width:100px;padding:3px 6px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;text-align:right';
+  let html=`<table class="stmt" style="margin-top:4px"><thead><tr><th>Asset</th><th class="right">Cost</th><th class="right">Accum. Dep.</th><th class="right">Carrying Value</th></tr></thead><tbody>`;
+  f.rows.forEach(r=>{
+    html+=`<tr><td>${esc(r.p.label)}</td><td class="right">${money(r.costCY,cur)}</td><td class="right">${money(r.accDepCY,cur)}</td><td class="right"><b>${money(r.closeCV,cur)}</b></td></tr>`;
+  });
+  html+=`<tr class="total-row"><td><b>Total</b></td><td class="right"><b>${money(T('costCY'),cur)}</b></td><td class="right"><b>${money(T('accDepCY'),cur)}</b></td><td class="right"><b>${money(T('closeCV'),cur)}</b></td></tr></tbody></table>`;
+  if(f.hasPY){
+    html+=`<p style="font-size:12px;margin:18px 0 6px" class="muted">The carrying amounts can be reconciled as follows:</p>
+    <table class="stmt"><thead><tr><th></th><th class="right">Opening CV<br><span style="font-weight:400">prior year-end</span></th><th class="right">Additions</th><th class="right">Disposals</th><th class="right">Depreciation</th><th class="right">Closing CV<br><span style="font-weight:400">current</span></th></tr></thead><tbody>`;
+    f.rows.forEach(r=>{
+      let k=r.noteKey;
+      html+=`<tr><td>${esc(r.p.label)}</td><td class="right">${money(r.openCV,cur)}</td>
+        <td class="right"><input type="number" step="0.01" value="${r.adds}" style="${inp}" onchange="ppeSet('${k}','additions',this.value)">
+          <div style="font-size:10px">${r.manual?`<a style="cursor:pointer;color:#b45309" title="Revert to auto (${money(r.autoAdds,cur)})" onclick="ppeAutoAdds('${k}')">manual ↺</a>`:'<span class="muted">auto</span>'}</div></td>
+        <td class="right"><input type="number" step="0.01" value="${r.disp||''}" placeholder="0.00" style="${inp}" onchange="ppeSet('${k}','disposals',this.value)"></td>
+        <td class="right">${r.dep?money(r.dep,cur):'-'}</td><td class="right"><b>${money(r.closeCV,cur)}</b></td></tr>`;
+    });
+    html+=`<tr class="total-row"><td><b>Total</b></td><td class="right"><b>${money(T('openCV'),cur)}</b></td><td class="right"><b>${T('adds')?money(T('adds'),cur):'-'}</b></td><td class="right"><b>${T('disp')?money(T('disp'),cur):'-'}</b></td><td class="right"><b>${T('dep')?money(T('dep'),cur):'-'}</b></td><td class="right"><b>${money(T('closeCV'),cur)}</b></td></tr></tbody></table>`;
+    f.rows.filter(r=>Math.abs(r.diff)>5).forEach(r=>{
+      html+=`<div style="color:var(--bad);font-weight:bold;font-size:11px;margin-top:4px">⚠ ${esc(r.p.label)}: opening + additions − disposals − depreciation differs from closing by ${money(r.diff,cur)}</div>`;
+    });
+  } else {
+    html+=`<p class="muted" style="font-size:12px;margin-top:10px">Import the prior year Balance Sheet to show the reconciliation.</p>`;
+  }
+  html+=`<div style="margin-top:10px">`+f.rows.map(r=>`<div style="margin-bottom:6px"><label style="font-size:11px">Comment – ${esc(r.p.label)}</label>
+    <textarea rows="2" style="width:100%;font-size:12px;padding:5px;border:1px solid var(--line);border-radius:6px" onchange="ppeSet('${r.noteKey}','note',this.value)">${esc(r.pn.note||'')}</textarea></div>`).join('')+`</div>`;
+  return html;
+}
+function ppeSet(key,field,val){
+  if(!client.ppeNotes[key])client.ppeNotes[key]={additions:0,disposals:0,note:''};
+  if(field==='note')client.ppeNotes[key].note=val;
+  else{client.ppeNotes[key][field]=num(val);if(field==='additions')client.ppeNotes[key].additionsManual=true;}
+  renderNotes();mark();
+}
+function ppeAutoAdds(key){client.ppeNotes[key].additionsManual=false;renderNotes();mark();}
 
 // Clean print version of PPE note — no inputs or textareas
 function renderPPENoteContentPrint(cur){
-  let ppeClasses=getPPEClasses();
-  if(!ppeClasses.length)return '';
-  let hasPY=Object.keys(client.raw.bs_py.accounts||{}).length>0;
-  let html='';
-  ppeClasses.forEach(function(p){
-    let costCY=getBSValue(p.costId,true);
-    let accDepCY=getBSValue(p.accDepId,true);
-    let nbvCY=costCY-Math.abs(accDepCY);
-    let costPY=hasPY?getBSValue(p.costId,false):null;
-    let accDepPY=hasPY?getBSValue(p.accDepId,false):null;
-    let nbvPY=hasPY?(costPY-Math.abs(accDepPY)):null;
-    let depYTD=getPLYTDValue(p.depId);
-    if(!costCY&&!accDepCY&&(!hasPY||(!costPY&&!accDepPY)))return;
-    let noteKey='ppe_'+p.key;
-    if(!client.ppeNotes[noteKey])client.ppeNotes[noteKey]={additions:0,disposals:0,note:''};
-    let pn=client.ppeNotes[noteKey];
-    let additions=num(pn.additions);
-    let disposals=num(pn.disposals);
-    html+='<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)">'+
-      '<b>'+esc(p.label)+'</b>'+
-      '<table class="stmt" style="margin-top:8px">'+
-        '<thead><tr><th></th><th class="right">Cost</th><th class="right">Acc. Dep</th><th class="right">NBV</th></tr></thead>'+
-        '<tbody>';
-    if(hasPY&&nbvPY!==null){
-      html+='<tr><td>Opening balance (prior year BS)</td>'+
-        '<td class="right">'+money(costPY,cur)+'</td>'+
-        '<td class="right">('+money(Math.abs(accDepPY),cur)+')</td>'+
-        '<td class="right">'+money(nbvPY,cur)+'</td></tr>';
-    }
-    html+='<tr><td>Additions</td><td class="right">'+money(additions,cur)+'</td><td class="right">—</td><td class="right">'+money(additions,cur)+'</td></tr>';
-    html+='<tr><td>Disposals (at NBV)</td><td class="right">—</td><td class="right">—</td><td class="right">('+money(disposals,cur)+')</td></tr>';
-    html+='<tr><td>Depreciation (P&L YTD)</td><td class="right">—</td><td class="right">('+money(Math.abs(depYTD),cur)+')</td><td class="right">('+money(Math.abs(depYTD),cur)+')</td></tr>';
-    html+='<tr class="total-row"><td><b>Closing balance (current BS)</b></td>'+
-      '<td class="right"><b>'+money(costCY,cur)+'</b></td>'+
-      '<td class="right"><b>('+money(Math.abs(accDepCY),cur)+')</b></td>'+
-      '<td class="right"><b>'+money(nbvCY,cur)+'</b></td></tr>';
-    html+='</tbody></table>';
-    if(pn.note)html+='<p style="margin:6px 0 0;font-size:12px">'+esc(pn.note)+'</p>';
-    html+='</div>';
-  });
-  return html;
+  if(!getPPEClasses().length)return '';
+  let f=ppeFigures();
+  if(!f.rows.length)return '';
+  let T=(k)=>f.rows.reduce((s,r)=>s+r[k],0);
+  let h='<table class="stmt"><thead><tr><th>Asset</th><th class="right">Cost</th><th class="right">Accum. Dep.</th><th class="right">Carrying Value</th></tr></thead><tbody>';
+  f.rows.forEach(r=>{h+='<tr><td>'+esc(r.p.label)+'</td><td class="right">'+money(r.costCY,cur)+'</td><td class="right">'+money(r.accDepCY,cur)+'</td><td class="right"><b>'+money(r.closeCV,cur)+'</b></td></tr>';});
+  h+='<tr class="total-row"><td><b>Total</b></td><td class="right"><b>'+money(T('costCY'),cur)+'</b></td><td class="right"><b>'+money(T('accDepCY'),cur)+'</b></td><td class="right"><b>'+money(T('closeCV'),cur)+'</b></td></tr></tbody></table>';
+  if(f.hasPY){
+    h+='<p style="font-size:12px;margin:16px 0 6px">The carrying amounts can be reconciled as follows:</p>'+
+      '<table class="stmt"><thead><tr><th></th><th class="right">Opening CV</th><th class="right">Additions</th><th class="right">Disposals</th><th class="right">Depreciation</th><th class="right">Closing CV</th></tr></thead><tbody>';
+    f.rows.forEach(r=>{h+='<tr><td>'+esc(r.p.label)+'</td><td class="right">'+money(r.openCV,cur)+'</td><td class="right">'+(r.adds?money(r.adds,cur):'-')+'</td><td class="right">'+(r.disp?money(r.disp,cur):'-')+'</td><td class="right">'+(r.dep?money(r.dep,cur):'-')+'</td><td class="right"><b>'+money(r.closeCV,cur)+'</b></td></tr>';});
+    h+='<tr class="total-row"><td><b>Total</b></td><td class="right"><b>'+money(T('openCV'),cur)+'</b></td><td class="right"><b>'+(T('adds')?money(T('adds'),cur):'-')+'</b></td><td class="right"><b>'+(T('disp')?money(T('disp'),cur):'-')+'</b></td><td class="right"><b>'+(T('dep')?money(T('dep'),cur):'-')+'</b></td><td class="right"><b>'+money(T('closeCV'),cur)+'</b></td></tr></tbody></table>';
+  }
+  f.rows.forEach(r=>{if(r.pn.note)h+='<p style="margin:6px 0 0;font-size:12px"><b>'+esc(r.p.label)+':</b> '+esc(r.pn.note)+'</p>';});
+  return h;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3574,49 +3581,49 @@ function renderDashboard(){
 
   // Compute key figures
   let incCm=getCoaValue('income.sales',rm)+getCoaValue('income.other',rm);
-  let cosCm=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((s,id)=>s+getCoaValue('cogs.'+id,rm),0);
+  let cosCm=XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((s,id)=>s+getCoaValue('cogs.'+id,rm),0);
   let gpCm=incCm-cosCm;
   let gpPctCm=incCm?gpCm/incCm:0;
-  let expIds=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'];
+  let expIds=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.');
   let expCm=expIds.reduce((s,id)=>s+getCoaValue('expense.'+id,rm),0);
-  let oiCm=['interest_received','discounts_received','etd_deduction','recoveries'].reduce((s,id)=>s+getCoaValue('other_income.'+id,rm),0);
-  let oeCm=['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'].reduce((s,id)=>s+getCoaValue('other_expense.'+id,rm),0);
+  let oiCm=XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.').reduce((s,id)=>s+getCoaValue('other_income.'+id,rm),0);
+  let oeCm=XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.').reduce((s,id)=>s+getCoaValue('other_expense.'+id,rm),0);
   let npCm=gpCm+oiCm-expCm-oeCm;
   let npPctCm=incCm?npCm/incCm:0;
 
   let incYtd=ytd.reduce((s,m)=>s+getCoaValue('income.sales',m)+getCoaValue('income.other',m),0);
-  let gpYtd=incYtd-ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m),0),0);
-  let npYtd=gpYtd+ytd.reduce((s,m)=>s+['interest_received','discounts_received','etd_deduction','recoveries'].reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m),0),0)
+  let gpYtd=incYtd-ytd.reduce((s,m)=>s+XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m),0),0);
+  let npYtd=gpYtd+ytd.reduce((s,m)=>s+XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.').reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m),0),0)
             -ytd.reduce((s,m)=>s+expIds.reduce((ss,id)=>ss+getCoaValue('expense.'+id,m),0),0)
-            -ytd.reduce((s,m)=>s+['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'].reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m),0),0);
+            -ytd.reduce((s,m)=>s+XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.').reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m),0),0);
 
   // Budget
   let incBudCm=getBudget('income.sales',rm)+getBudget('income.other',rm);
-  let cosBudCm=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((s,id)=>s+getBudget('cogs.'+id,rm),0);
+  let cosBudCm=XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((s,id)=>s+getBudget('cogs.'+id,rm),0);
   let gpBudCm=incBudCm-cosBudCm;
   let incBudYtd=ytd.reduce((s,m)=>s+getBudget('income.sales',m)+getBudget('income.other',m),0);
-  let cosBudYtd=ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((ss,id)=>ss+getBudget('cogs.'+id,m),0),0);
+  let cosBudYtd=ytd.reduce((s,m)=>s+XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((ss,id)=>ss+getBudget('cogs.'+id,m),0),0);
   let gpBudYtd=incBudYtd-cosBudYtd;
   // NP budget for dashboard cards
-  let expBudCm_db=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'].reduce((s,id)=>s+getBudget('expense.'+id,rm),0);
-  let expBudYtd_db=ytd.reduce((s,m)=>s+['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'].reduce((ss,id)=>ss+getBudget('expense.'+id,m),0),0);
+  let expBudCm_db=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.').reduce((s,id)=>s+getBudget('expense.'+id,rm),0);
+  let expBudYtd_db=ytd.reduce((s,m)=>s+XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.').reduce((ss,id)=>ss+getBudget('expense.'+id,m),0),0);
   let npBudCm=gpBudCm-expBudCm_db;  // simplified: GP budget - opex budget
   let npBudYtd=gpBudYtd-expBudYtd_db;
 
   // PY — current month
   let incPyCm=getCoaValue('income.sales',rm,client.raw.pl_py)+getCoaValue('income.other',rm,client.raw.pl_py);
-  let cosPyCm=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((s,id)=>s+getCoaValue('cogs.'+id,rm,client.raw.pl_py),0);
+  let cosPyCm=XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((s,id)=>s+getCoaValue('cogs.'+id,rm,client.raw.pl_py),0);
   let gpPyCm=incPyCm-cosPyCm;
-  let expIds_db=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'];
-  let oiIds_db=['interest_received','discounts_received','etd_deduction','recoveries'];
-  let oeIds_db=['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'];
+  let expIds_db=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.');
+  let oiIds_db=XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.');
+  let oeIds_db=XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.');
   let expPyCm=expIds_db.reduce((s,id)=>s+getCoaValue('expense.'+id,rm,client.raw.pl_py),0);
   let oiPyCm=oiIds_db.reduce((s,id)=>s+getCoaValue('other_income.'+id,rm,client.raw.pl_py),0);
   let oePyCm=oeIds_db.reduce((s,id)=>s+getCoaValue('other_expense.'+id,rm,client.raw.pl_py),0);
   let npPyCm=gpPyCm+oiPyCm-expPyCm-oePyCm;
   // PY — YTD
   let incPyYtd=ytd.reduce((s,m)=>s+getCoaValue('income.sales',m,client.raw.pl_py)+getCoaValue('income.other',m,client.raw.pl_py),0);
-  let cosPyYtd=ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m,client.raw.pl_py),0),0);
+  let cosPyYtd=ytd.reduce((s,m)=>s+XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m,client.raw.pl_py),0),0);
   let gpPyYtd=incPyYtd-cosPyYtd;
   let expPyYtd=ytd.reduce((s,m)=>s+expIds_db.reduce((ss,id)=>ss+getCoaValue('expense.'+id,m,client.raw.pl_py),0),0);
   let oiPyYtd=ytd.reduce((s,m)=>s+oiIds_db.reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m,client.raw.pl_py),0),0);
@@ -3652,7 +3659,7 @@ function renderDashboard(){
   let trendSales=trendMonths.map(m=>getCoaValue('income.sales',m)+getCoaValue('income.other',m));
   let trendGP=trendMonths.map(m=>{
     let inc=getCoaValue('income.sales',m)+getCoaValue('income.other',m);
-    let cos=['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((s,id)=>s+getCoaValue('cogs.'+id,m),0);
+    let cos=XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((s,id)=>s+getCoaValue('cogs.'+id,m),0);
     return inc-cos;
   });
   let maxBar=Math.max(...trendSales,1);
@@ -3794,9 +3801,9 @@ function renderDashboard(){
       let gplr=labour?gpCm2/labour:null;
       let gplrTarget=client.kpiBenchmarks.gplr_target||2.0;
       let labourPY=getCoaValue('cogs.wages',rm,client.raw.pl_py)+getCoaValue('expense.director_remuneration',rm,client.raw.pl_py)+getCoaValue('expense.salaries_wages',rm,client.raw.pl_py);
-      let gpCmPY=incPyCm-((['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce(function(s,id){return s+getCoaValue('cogs.'+id,rm,client.raw.pl_py);},0)));
+      let gpCmPY=incPyCm-((XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce(function(s,id){return s+getCoaValue('cogs.'+id,rm,client.raw.pl_py);},0)));
       let gplrPY=labourPY?gpCmPY/labourPY:null;
-      let gpYtd2=incYtd-ytd.reduce(function(s,m){return s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce(function(ss,id){return ss+getCoaValue('cogs.'+id,m);},0);},0);
+      let gpYtd2=incYtd-ytd.reduce(function(s,m){return s+XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce(function(ss,id){return ss+getCoaValue('cogs.'+id,m);},0);},0);
       let labourYtd=ytd.reduce(function(s,m){return s+getCoaValue('cogs.wages',m)+getCoaValue('expense.director_remuneration',m)+getCoaValue('expense.salaries_wages',m);},0);
       let gplrYtd=labourYtd?gpYtd2/labourYtd:null;
       let gplrOk=gplr!==null&&gplr>=gplrTarget;
@@ -3904,11 +3911,11 @@ function qcChecks(){
     let bsNP=getCoaValue('equity.current_year',rm,client.raw.bs)||0;
     // YTD net profit from P&L
     let incYtd=ytd.reduce((s,m)=>s+getCoaValue('income.sales',m)+getCoaValue('income.other',m),0);
-    let cosYtd=ytd.reduce((s,m)=>s+['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'].reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m),0),0);
-    let expIds=['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'];
+    let cosYtd=ytd.reduce((s,m)=>s+XL(['opening_stock','purchases','closing_stock','wages','consumables','r_and_m','cos_direct','shared_wages','shared_repairs_and_maintenance','shared_consumables'],'cogs.').reduce((ss,id)=>ss+getCoaValue('cogs.'+id,m),0),0);
+    let expIds=XL(['accounting_fees','advertising','bank_charges','cleaning','computer_expenses','courier','director_remuneration','electricity','entertainment','fuel','insurance','legal_fees','motor_vehicle','printing_stationery','rent','salaries_wages','security','staff_welfare','subscription','telephone_internet','training','travel','water','early_settlement_discount_allowed','unallocated_transactions'],'expense.');
     let expYtd=ytd.reduce((s,m)=>s+expIds.reduce((ss,id)=>ss+getCoaValue('expense.'+id,m),0),0);
-    let oiYtd=ytd.reduce((s,m)=>s+['interest_received','discounts_received','etd_deduction','recoveries'].reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m),0),0);
-    let oeYtd=ytd.reduce((s,m)=>s+['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'].reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m),0),0);
+    let oiYtd=ytd.reduce((s,m)=>s+XL(['interest_received','discounts_received','etd_deduction','recoveries'],'other_income.').reduce((ss,id)=>ss+getCoaValue('other_income.'+id,m),0),0);
+    let oeYtd=ytd.reduce((s,m)=>s+XL(['interest_paid','interest_paid_connected_persons','interest_on_installment_agreements','depreciation','equipment_rental','bad_debts','forex','fines','income_tax'],'other_expense.').reduce((ss,id)=>ss+getCoaValue('other_expense.'+id,m),0),0);
     let plNP=incYtd-cosYtd+oiYtd-expYtd-oeYtd;
     let diff=Math.abs(bsNP-plNP);
     let pctDiff=Math.abs(plNP)>100?diff/Math.abs(plNP):0;
